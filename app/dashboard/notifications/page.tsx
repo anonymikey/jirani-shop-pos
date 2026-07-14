@@ -1,13 +1,13 @@
 import { createClient } from "@/lib/supabase/server"
-import { ReportsDashboard } from "@/components/reports/reports-dashboard"
+import { NotificationCenter } from "@/components/notifications/notification-center"
 import { redirect } from "next/navigation"
 
 export const metadata = {
-  title: 'Reports | Jirani Shop',
-  description: 'Sales, profit, inventory and credit reports',
+  title: 'Notifications | Jirani Shop',
+  description: 'View and manage your alerts and notifications',
 }
 
-export default async function ReportsPage() {
+export default async function NotificationsPage() {
   const supabase = await createClient()
   const {
     data: { user },
@@ -30,13 +30,13 @@ export default async function ReportsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Notifications</h1>
         <p className="text-muted-foreground mt-2">
-          Deep dive into your sales, profit, inventory and credit analysis
+          Stay updated with important alerts about stock, debts, payments and synchronization
         </p>
       </div>
 
-      <ReportsDashboard shopId={profile.shop_id} />
+      <NotificationCenter shopId={profile.shop_id} />
     </div>
   )
 }
