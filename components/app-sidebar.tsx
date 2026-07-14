@@ -12,6 +12,8 @@ import {
   Settings,
   Store,
   LogOut,
+  Bell,
+  DollarSign,
 } from "lucide-react"
 import {
   Sidebar,
@@ -53,8 +55,13 @@ const groups = [
     items: [
       { title: "Inventory", href: "/dashboard/inventory", icon: Boxes },
       { title: "Customers", href: "/dashboard/customers", icon: Users },
+      { title: "Expenses", href: "/dashboard/expenses", icon: DollarSign },
       { title: "Reports", href: "/dashboard/reports", icon: BarChart3 },
     ],
+  },
+  {
+    label: "Alerts",
+    items: [{ title: "Notifications", href: "/dashboard/notifications", icon: Bell }],
   },
   {
     label: "System",
