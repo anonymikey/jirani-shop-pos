@@ -12,14 +12,19 @@ export default async function DashboardLayout({ children }: { children: React.Re
   } = await supabase.auth.getUser()
   if (!user) redirect("/auth/login")
 
-  const { data: profile } = await supabase.from("profiles").select("full_name, role").eq("id", user.id).single()
+  const { data: organizationId } = await supabase.rpc("get_or_create_current_organization")
+  const { data: membership } = organizationId
+    ? await supabase.from("organization_members").select("role, is_active").eq("organization_id", organizationId).eq("user_id", user.id).single()
+    : { data: null }
+  if (!membership?.is_active) redirect("/auth/login?error=account-disabled")
+  const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user.id).single()
 
   return (
     <SidebarProvider>
       <AppSidebar
         name={profile?.full_name ?? ""}
         email={user.email ?? ""}
-        role={profile?.role ?? "cashier"}
+        role={membership.role ?? "cashier"}
       />
       <SidebarInset>
         <header className="sticky top-0 z-10 flex h-14 items-center gap-2 border-b border-border bg-background/80 px-4 backdrop-blur">
