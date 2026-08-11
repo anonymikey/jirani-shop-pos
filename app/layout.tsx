@@ -2,6 +2,7 @@ import { Analytics } from '@vercel/analytics/next'
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Toaster } from '@/components/ui/sonner'
+import { PwaRegister } from '@/components/pwa-register'
 import './globals.css'
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
@@ -14,6 +15,7 @@ export const metadata: Metadata = {
   title: 'JIRANI SYSTEM | Smart Retail & POS',
   description: 'Point of sale, inventory, and business management for modern retailers.',
   generator: 'v0.app',
+  manifest: '/manifest.webmanifest',
   icons: {
     icon: [
       {
@@ -41,6 +43,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} bg-background`}>
       <body className="font-sans antialiased">
+        <PwaRegister />
         {children}
         <Toaster />
         {process.env.NODE_ENV === 'production' && <Analytics />}

@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { AppSidebar } from "@/components/app-sidebar"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
+import { SyncStatus } from "@/components/sync-status"
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -27,6 +28,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <span className="text-sm font-medium text-muted-foreground">
             {new Date().toLocaleDateString("en-KE", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
           </span>
+          <div className="ml-auto"><SyncStatus /></div>
         </header>
         <div className="flex-1 p-4 md:p-6">{children}</div>
       </SidebarInset>

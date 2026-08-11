@@ -27,67 +27,48 @@ export async function checkout(input: CheckoutInput) {
   if (!user) return { error: "Not authenticated" }
   if (input.lines.length === 0) return { error: "Cart is empty" }
 
-  const subtotal = input.lines.reduce((a, l) => a + l.unit_price * l.quantity, 0)
-  const discount = Math.min(Math.max(input.discount, 0), subtotal)
-  const taxable = subtotal - discount
-  const tax = Math.round(taxable * (input.taxRate / 100) * 100) / 100
-  const total = taxable + tax
-  const profit =
-    input.lines.reduce((a, l) => a + (l.unit_price - l.cost_price) * l.quantity, 0) - discount
+  const invalidLine = input.lines.find(
+    (line) => !line.product_id || !Number.isInteger(line.quantity) || line.quantity <= 0,
+  )
+  if (invalidLine) return { error: "Invalid cart quantity" }
 
+  const { data: organizationId, error: organizationError } = await supabase.rpc(
+    "get_or_create_current_organization",
+  )
+  if (organizationError || !organizationId) {
+    return { error: "Your shop could not be initialized" }
+  }
+
+  const paymentMethod =
+    input.paymentMethod === "mpesa"
+      ? "mobile_money"
+      : input.paymentMethod === "debt"
+        ? "credit"
+        : input.paymentMethod
   const receiptNumber = `JR-${Date.now().toString().slice(-8)}`
-
-  const { data: sale, error: saleError } = await supabase
-    .from("sales")
-    .insert({
-      user_id: user.id,
+  const { data, error } = await supabase.rpc("create_sale_atomic", {
+    payload: {
+      organization_id: organizationId,
       receipt_number: receiptNumber,
       customer_id: input.customerId,
-      subtotal,
-      discount,
-      tax,
-      total,
-      profit,
-      payment_method: input.paymentMethod,
-      status: "completed",
-    })
-    .select("id")
-    .single()
+      discount: Math.max(0, Number(input.discount) || 0),
+      tax: Math.max(0, Number(input.taxRate) || 0),
+      payment_method: paymentMethod,
+      items: input.lines.map((line) => ({
+        product_id: line.product_id,
+        quantity: line.quantity,
+      })),
+    },
+  })
 
-  if (saleError || !sale) return { error: saleError?.message ?? "Failed to create sale" }
-
-  const items = input.lines.map((l) => ({
-    user_id: user.id,
-    sale_id: sale.id,
-    product_id: l.product_id,
-    product_name: l.product_name,
-    quantity: l.quantity,
-    unit_price: l.unit_price,
-    cost_price: l.cost_price,
-    line_total: l.unit_price * l.quantity,
-  }))
-
-  const { error: itemsError } = await supabase.from("sale_items").insert(items)
-  if (itemsError) return { error: itemsError.message }
-
-  // Decrement stock per product
-  for (const l of input.lines) {
-    const { data: product } = await supabase
-      .from("products")
-      .select("quantity")
-      .eq("id", l.product_id)
-      .single()
-    if (product) {
-      await supabase
-        .from("products")
-        .update({ quantity: Math.max(0, product.quantity - l.quantity) })
-        .eq("id", l.product_id)
-    }
-  }
+  if (error || !data) return { error: error?.message ?? "Failed to complete sale" }
 
   revalidatePath("/dashboard")
   revalidatePath("/dashboard/pos")
-  return { receiptNumber, total }
+  return {
+    receiptNumber: data.receipt_number as string,
+    total: Number(data.subtotal),
+  }
 }
 
 const SAMPLE = [
