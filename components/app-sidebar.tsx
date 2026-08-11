@@ -12,6 +12,7 @@ import {
   Settings,
   Store,
   LogOut,
+  Bell,
 } from "lucide-react"
 import {
   Sidebar,
@@ -58,7 +59,10 @@ const groups = [
   },
   {
     label: "System",
-    items: [{ title: "Settings", href: "/dashboard/settings", icon: Settings }],
+    items: [
+      { title: "Notifications", href: "/dashboard/notifications", icon: Bell },
+      { title: "Settings", href: "/dashboard/settings", icon: Settings },
+    ],
   },
 ]
 

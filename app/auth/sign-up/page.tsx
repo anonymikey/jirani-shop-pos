@@ -25,13 +25,19 @@ export default function SignUpPage() {
     setLoading(true)
     setError(null)
     const supabase = createClient()
+    const { data: canRegister, error: gateError } = await supabase.rpc("can_register_new_user")
+    if (gateError || canRegister !== true) {
+      setError("New account registration is currently closed. Ask your shop administrator for an invite.")
+      setLoading(false)
+      return
+    }
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         emailRedirectTo:
           process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ?? `${window.location.origin}/auth/callback`,
-        data: { full_name: fullName, role: "admin" },
+        data: { full_name: fullName },
       },
     })
     if (error) {
