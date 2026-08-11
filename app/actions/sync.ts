@@ -13,11 +13,10 @@ export async function replaySyncOperation(input: { operation: string; payload: R
   return { success: true, id: data.id }
 }
 
-export async function markNotificationRead(id: string) {
+export async function markNotificationRead(formData: FormData) {
+  const id = String(formData.get("id") || "")
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: "Not authenticated" }
-  const { error } = await supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("id", id).eq("user_id", user.id)
-  if (error) return { error: "Could not update notification" }
-  return { success: true }
+  if (!user || !id) return
+  await supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("id", id).eq("user_id", user.id)
 }
