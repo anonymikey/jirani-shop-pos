@@ -94,12 +94,7 @@ export function AppSidebar({ name, email, role }: { name: string; email: string;
                   const active = pathname === item.href
                   return (
                     <SidebarMenuItem key={item.href}>
-                      <SidebarMenuButton asChild isActive={active} tooltip={item.title}>
-                        <Link href={item.href}>
-                          <item.icon className="size-4" />
-                          <span>{item.title}</span>
-                        </Link>
-                      </SidebarMenuButton>
+                      <SidebarMenuButton render={<Link href={item.href}><item.icon className="size-4" /><span>{item.title}</span></Link>} isActive={active} tooltip={item.title} />
                     </SidebarMenuItem>
                   )
                 })}
@@ -110,7 +105,7 @@ export function AppSidebar({ name, email, role }: { name: string; email: string;
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border">
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+          <DropdownMenuTrigger>
             <SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent">
               <Avatar className="size-8 rounded-md">
                 <AvatarFallback className="rounded-md bg-sidebar-primary text-sidebar-primary-foreground text-xs">
@@ -133,7 +128,7 @@ export function AppSidebar({ name, email, role }: { name: string; email: string;
             <DropdownMenuSeparator />
             <form action={signOut}>
               <button type="submit" className="w-full">
-                <DropdownMenuItem className="cursor-pointer" asChild>
+                <DropdownMenuItem className="cursor-pointer">
                   <span className="flex w-full items-center">
                     <LogOut className="mr-2 size-4" /> Sign out
                   </span>
