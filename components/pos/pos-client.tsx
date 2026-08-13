@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, useTransition } from "react"
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 import { toast } from "sonner"
 import { checkout, seedProducts, type CartLine } from "@/app/actions/pos"
 import { Button } from "@/components/ui/button"
@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { formatKES } from "@/lib/format"
+import { clearOfflineOperation, getOfflineCatalog, getOfflineOperations, queueOfflineOperation, saveOfflineCatalog, updateOfflineOperation } from "@/lib/offline-queue"
 import { Search, Plus, Minus, Trash2, ShoppingCart, PackageOpen, Banknote, Smartphone, CreditCard, NotebookPen, Loader2 } from "lucide-react"
 
 type Product = {
@@ -33,18 +34,63 @@ const PAYMENTS = [
 
 export function PosClient({ products }: { products: Product[] }) {
   const [query, setQuery] = useState("")
+  const [catalog, setCatalog] = useState<Product[]>(products)
   const [cart, setCart] = useState<Line[]>([])
   const [discount, setDiscount] = useState(0)
   const [taxRate, setTaxRate] = useState(0)
   const [payment, setPayment] = useState<(typeof PAYMENTS)[number]["value"]>("cash")
   const [pending, startTransition] = useTransition()
   const [seeding, startSeeding] = useTransition()
+  const [offlineCount, setOfflineCount] = useState(0)
+
+  const syncOffline = useCallback(async () => {
+    if (typeof navigator !== "undefined" && !navigator.onLine) return
+    const operations = await getOfflineOperations()
+    setOfflineCount(operations.length)
+    for (const operation of operations) {
+      if (operation.nextRetryAt > Date.now()) continue
+      try {
+        const result = await checkout(operation.payload as Parameters<typeof checkout>[0])
+        if ("error" in result) throw new Error(result.error)
+        await clearOfflineOperation(operation.idempotencyKey)
+        toast.success(`Offline sale synced${result.duplicate ? " (already recorded)" : ""}`)
+      } catch (error) {
+        const attempts = operation.attempts + 1
+        await updateOfflineOperation(operation.idempotencyKey, { status: "failed", attempts, lastError: error instanceof Error ? error.message : "Sync failed", nextRetryAt: Date.now() + Math.min(300000, 1000 * 2 ** attempts) })
+      }
+    }
+    setOfflineCount((await getOfflineOperations()).length)
+  }, [])
+
+  useEffect(() => {
+    const handleOnline = () => void syncOffline()
+    const handleServiceWorker = (event: MessageEvent) => {
+      if (event.data?.type === "jirani-sync-request") handleOnline()
+    }
+    window.addEventListener("online", handleOnline)
+    navigator.serviceWorker?.addEventListener("message", handleServiceWorker)
+    void navigator.serviceWorker?.ready.then((registration) => {
+      const sync = (registration as ServiceWorkerRegistration & { sync?: { register: (tag: string) => Promise<void> } }).sync
+      return sync?.register("jirani-offline-sync").catch(() => undefined)
+    })
+    const timer = window.setTimeout(handleOnline, 0)
+    return () => {
+      window.clearTimeout(timer)
+      window.removeEventListener("online", handleOnline)
+      navigator.serviceWorker?.removeEventListener("message", handleServiceWorker)
+    }
+  }, [syncOffline])
+
+  useEffect(() => {
+    if (products.length > 0) void saveOfflineCatalog(products)
+    else void getOfflineCatalog<Product[]>().then((cached) => cached && setCatalog(cached))
+  }, [products])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return products
-    return products.filter((p) => p.name.toLowerCase().includes(q) || (p.brand ?? "").toLowerCase().includes(q))
-  }, [query, products])
+    if (!q) return catalog
+    return catalog.filter((p) => p.name.toLowerCase().includes(q) || (p.brand ?? "").toLowerCase().includes(q))
+  }, [query, catalog])
 
   function addToCart(p: Product) {
     if (p.quantity <= 0) {
@@ -104,15 +150,32 @@ export function PosClient({ products }: { products: Product[] }) {
       toast.error("Cart is empty")
       return
     }
+    const idempotencyKey = crypto.randomUUID()
+    const payload = {
+      lines: cart.map((line) => ({ product_id: line.product_id, product_name: line.product_name, quantity: line.quantity, unit_price: line.unit_price, cost_price: line.cost_price })),
+      discount: safeDiscount,
+      taxRate: taxRate || 0,
+      paymentMethod: payment,
+      customerId: null,
+      idempotencyKey,
+    }
     startTransition(async () => {
-      const res = await checkout({
-        lines: cart.map(({ stock, ...rest }) => rest),
-        discount: safeDiscount,
-        taxRate: taxRate || 0,
-        paymentMethod: payment,
-        customerId: null,
-      })
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        await queueOfflineOperation({ operation: "checkout", payload, idempotencyKey })
+        setOfflineCount((count) => count + 1)
+        setCart([])
+        toast.success("Sale saved offline and will sync when you reconnect")
+        return
+      }
+      const res = await checkout(payload)
       if ("error" in res) {
+        if (/network|fetch|failed to fetch/i.test(res.error ?? "")) {
+          await queueOfflineOperation({ operation: "checkout", payload, idempotencyKey })
+          setOfflineCount((count) => count + 1)
+          setCart([])
+          toast.success("Sale saved offline and will sync when you reconnect")
+          return
+        }
         toast.error(res.error)
         return
       }
@@ -147,7 +210,7 @@ export function PosClient({ products }: { products: Product[] }) {
           />
         </div>
 
-        {products.length === 0 ? (
+        {catalog.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
               <span className="flex size-12 items-center justify-center rounded-full bg-accent text-accent-foreground">
@@ -197,6 +260,7 @@ export function PosClient({ products }: { products: Product[] }) {
               <ShoppingCart className="size-5" />
               <h2 className="font-semibold">Current sale</h2>
               {cart.length > 0 && <Badge variant="secondary">{cart.length}</Badge>}
+              {offlineCount > 0 && <><Badge variant="outline">{offlineCount} awaiting sync</Badge><Button type="button" size="sm" variant="ghost" onClick={() => void syncOffline()}>Sync now</Button></>}
             </div>
 
             <ScrollArea className="h-[280px] pr-2">
