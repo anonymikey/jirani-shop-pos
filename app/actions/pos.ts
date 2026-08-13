@@ -17,6 +17,7 @@ export type CheckoutInput = {
   taxRate: number
   paymentMethod: "cash" | "mpesa" | "card" | "debt"
   customerId: string | null
+  idempotencyKey?: string
 }
 
 export async function checkout(input: CheckoutInput) {
@@ -54,6 +55,7 @@ export async function checkout(input: CheckoutInput) {
       discount: Math.max(0, Number(input.discount) || 0),
       tax: Math.max(0, Number(input.taxRate) || 0),
       payment_method: paymentMethod,
+      idempotency_key: input.idempotencyKey ?? crypto.randomUUID(),
       items: input.lines.map((line) => ({
         product_id: line.product_id,
         quantity: line.quantity,
@@ -67,7 +69,8 @@ export async function checkout(input: CheckoutInput) {
   revalidatePath("/dashboard/pos")
   return {
     receiptNumber: data.receipt_number as string,
-    total: Number(data.subtotal),
+    total: Number(data.total ?? data.subtotal),
+    duplicate: Boolean(data.duplicate),
   }
 }
 
