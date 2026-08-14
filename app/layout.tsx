@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Toaster } from '@/components/ui/sonner'
 import { PwaRegister } from '@/components/pwa-register'
+import { ThemeProvider } from '@/components/theme-provider'
 import './globals.css'
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
@@ -44,7 +45,7 @@ export default function RootLayout({
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} bg-background`}>
       <body className="font-sans antialiased">
         <PwaRegister />
-        {children}
+        <ThemeProvider>{children}</ThemeProvider>
         <Toaster />
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>

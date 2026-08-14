@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { ShieldAlert, ShieldCheck } from "lucide-react"
+import { AppearanceSettings } from "@/components/appearance-settings"
 
 const ERROR_MESSAGES: Record<string, string> = {
   "last-admin": "That change is blocked: it would leave the shop without an active admin.",
@@ -42,6 +43,8 @@ export default async function SettingsPage({
           <span>{ERROR_MESSAGES[error]}</span>
         </div>
       )}
+
+      <AppearanceSettings />
 
       <Card>
         <CardHeader><CardTitle>Account registration</CardTitle><CardDescription>Keep this off unless your team should be able to create accounts. The rule is enforced by the database, not just hidden in the interface.</CardDescription></CardHeader>

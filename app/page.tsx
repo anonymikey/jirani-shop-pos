@@ -5,11 +5,16 @@ import { Button } from "@/components/ui/button"
 import { Store, BarChart3, ScanLine, Boxes, Users, ArrowRight } from "lucide-react"
 
 export default async function HomePage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (user) redirect("/dashboard")
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (supabaseUrl && supabaseAnonKey) {
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (user) redirect("/dashboard")
+  }
 
   const features = [
     { icon: ScanLine, title: "Fast POS", desc: "Ring up sales in seconds with cash, M-Pesa, card or credit." },
