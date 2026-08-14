@@ -13,6 +13,8 @@ import {
   Store,
   LogOut,
   Bell,
+  UserRound,
+  ChevronUp,
 } from "lucide-react"
 import {
   Sidebar,
@@ -29,6 +31,7 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -109,36 +112,49 @@ export function AppSidebar({ name, email, role }: { name: string; email: string;
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border">
         <DropdownMenu>
-          <DropdownMenuTrigger>
-            <SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent">
-              <Avatar className="size-8 rounded-md">
-                <AvatarFallback className="rounded-md bg-sidebar-primary text-sidebar-primary-foreground text-xs">
-                  {initials}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex flex-col items-start text-left">
-                <span className="text-sm font-medium leading-none">{name || "User"}</span>
-                <span className="text-xs capitalize text-sidebar-foreground/60">{role}</span>
-              </div>
-            </SidebarMenuButton>
+          <DropdownMenuTrigger render={<SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent" />}>
+            <Avatar className="size-8 rounded-md">
+              <AvatarFallback className="rounded-md bg-sidebar-primary text-sidebar-primary-foreground text-xs">
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex min-w-0 flex-1 flex-col items-start text-left">
+              <span className="truncate text-sm font-medium leading-none">{name || "User"}</span>
+              <span className="truncate text-xs capitalize text-sidebar-foreground/60">{role}</span>
+            </div>
+            <ChevronUp className="ml-auto size-4" />
+            <span className="sr-only">Open account menu</span>
           </DropdownMenuTrigger>
           <DropdownMenuContent side="top" align="start" className="w-56">
-            <DropdownMenuLabel className="font-normal">
-              <div className="flex flex-col">
-                <span className="text-sm font-medium">{name || "User"}</span>
-                <span className="text-xs text-muted-foreground">{email}</span>
-              </div>
-            </DropdownMenuLabel>
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="font-normal">
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium">{name || "User"}</span>
+                  <span className="text-xs text-muted-foreground">{email}</span>
+                </div>
+              </DropdownMenuLabel>
+            </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <form action={signOut}>
-              <button type="submit" className="w-full">
-                <DropdownMenuItem className="cursor-pointer">
-                  <span className="flex w-full items-center">
-                    <LogOut className="mr-2 size-4" /> Sign out
-                  </span>
-                </DropdownMenuItem>
-              </button>
-            </form>
+            <DropdownMenuGroup>
+              <DropdownMenuItem render={<Link href="/dashboard/profile" />}>
+                <UserRound className="mr-2 size-4" /> Profile
+              </DropdownMenuItem>
+              <DropdownMenuItem render={<Link href="/dashboard/settings" />}>
+                <Settings className="mr-2 size-4" /> Settings
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuGroup>
+              <form action={signOut}>
+                <button type="submit" className="w-full">
+                  <DropdownMenuItem className="cursor-pointer">
+                    <span className="flex w-full items-center">
+                      <LogOut className="mr-2 size-4" /> Sign out
+                    </span>
+                  </DropdownMenuItem>
+                </button>
+              </form>
+            </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarFooter>
