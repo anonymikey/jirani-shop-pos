@@ -2,8 +2,8 @@
 
 import type React from "react"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { Suspense, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
@@ -12,12 +12,33 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Loader2 } from "lucide-react"
 
-export default function LoginPage() {
+function friendlyLoginError(message: string | null): string {
+  if (!message) return "We could not sign you in. Please try again."
+  const m = message.toLowerCase()
+  if (m.includes("invalid login") || m.includes("invalid credentials") || m.includes("invalid email")) {
+    return "Invalid email or password."
+  }
+  if (m.includes("email not confirmed") || m.includes("confirm your email")) {
+    return "Please confirm your email address before signing in."
+  }
+  if (m.includes("network") || m.includes("fetch") || m.includes("failed to fetch")) {
+    return "We could not reach the server. Check your connection and try again."
+  }
+  if (m.includes("too many")) {
+    return "Too many attempts. Please wait a moment and try again."
+  }
+  return "We could not sign you in. Please try again."
+}
+
+function LoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+
+  const accountDisabled = searchParams.get("error") === "account-disabled"
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -26,7 +47,7 @@ export default function LoginPage() {
     const supabase = createClient()
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
-      setError(error.message)
+      setError(friendlyLoginError(error.message))
       setLoading(false)
       return
     }
@@ -41,6 +62,11 @@ export default function LoginPage() {
         <CardDescription>Sign in to your JIRANI account to continue.</CardDescription>
       </CardHeader>
       <CardContent>
+        {accountDisabled && (
+          <p className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            This account has been deactivated. Ask your shop administrator to reactivate it.
+          </p>
+        )}
         <form onSubmit={handleLogin} className="flex flex-col gap-4">
           <div className="grid gap-2">
             <Label htmlFor="email">Email</Label>
@@ -77,5 +103,13 @@ export default function LoginPage() {
         </p>
       </CardContent>
     </Card>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   )
 }

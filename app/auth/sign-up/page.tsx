@@ -41,7 +41,14 @@ export default function SignUpPage() {
       },
     })
     if (error) {
-      setError(error.message)
+      const m = error.message.toLowerCase()
+      if (m.includes("already registered") || m.includes("already been registered") || m.includes("user already")) {
+        setError("An account with this email already exists. Try signing in instead.")
+      } else if (m.includes("registration") && m.includes("closed")) {
+        setError("New account registration is currently closed. Ask your shop administrator for an invite.")
+      } else {
+        setError("We could not create your account. Please try again.")
+      }
       setLoading(false)
       return
     }
