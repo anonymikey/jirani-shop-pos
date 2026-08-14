@@ -22,7 +22,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
   if (!organizationId) {
     console.error("[v0] Current organization lookup returned no organization", { userId: user.id })
-    throw new Error("Unable to resolve the current organization")
+    redirect("/?error=organization-not-found")
   }
 
   const { data: membership, error: membershipError } = await supabase
@@ -41,7 +41,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
   if (!membership) {
     console.error("[v0] Organization membership was not found", { userId: user.id, organizationId })
-    throw new Error("Unable to verify organization membership")
+    redirect("/?error=organization-access")
   }
   if (membership.is_active === false) redirect("/auth/login?error=account-disabled")
   const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user.id).single()
