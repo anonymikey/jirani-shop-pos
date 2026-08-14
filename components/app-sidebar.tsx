@@ -31,6 +31,7 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -125,29 +126,35 @@ export function AppSidebar({ name, email, role }: { name: string; email: string;
             <span className="sr-only">Open account menu</span>
           </DropdownMenuTrigger>
           <DropdownMenuContent side="top" align="start" className="w-56">
-            <DropdownMenuLabel className="font-normal">
-              <div className="flex flex-col">
-                <span className="text-sm font-medium">{name || "User"}</span>
-                <span className="text-xs text-muted-foreground">{email}</span>
-              </div>
-            </DropdownMenuLabel>
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="font-normal">
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium">{name || "User"}</span>
+                  <span className="text-xs text-muted-foreground">{email}</span>
+                </div>
+              </DropdownMenuLabel>
+            </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem render={<Link href="/dashboard/profile" />}>
-              <UserRound className="mr-2 size-4" /> Profile
-            </DropdownMenuItem>
-            <DropdownMenuItem render={<Link href="/dashboard/settings" />}>
-              <Settings className="mr-2 size-4" /> Settings
-            </DropdownMenuItem>
+            <DropdownMenuGroup>
+              <DropdownMenuItem render={<Link href="/dashboard/profile" />}>
+                <UserRound className="mr-2 size-4" /> Profile
+              </DropdownMenuItem>
+              <DropdownMenuItem render={<Link href="/dashboard/settings" />}>
+                <Settings className="mr-2 size-4" /> Settings
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <form action={signOut}>
-              <button type="submit" className="w-full">
-                <DropdownMenuItem className="cursor-pointer">
-                  <span className="flex w-full items-center">
-                    <LogOut className="mr-2 size-4" /> Sign out
-                  </span>
-                </DropdownMenuItem>
-              </button>
-            </form>
+            <DropdownMenuGroup>
+              <form action={signOut}>
+                <button type="submit" className="w-full">
+                  <DropdownMenuItem className="cursor-pointer">
+                    <span className="flex w-full items-center">
+                      <LogOut className="mr-2 size-4" /> Sign out
+                    </span>
+                  </DropdownMenuItem>
+                </button>
+              </form>
+            </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarFooter>
