@@ -17,7 +17,19 @@ export type CheckoutInput = {
   taxRate: number
   paymentMethod: "cash" | "mpesa" | "card" | "debt"
   customerId: string | null
+  dueAt?: string | null
   idempotencyKey?: string
+}
+
+function friendlyCheckoutError(message: string | null): string {
+  if (!message) return "We could not complete the sale. Please try again."
+  const m = message.toLowerCase()
+  if (m.includes("credit limit")) return "This customer has reached their credit limit for this sale."
+  if (m.includes("insufficient stock")) return "Not enough stock for one of the items. Adjust the quantity and try again."
+  if (m.includes("customer is required") || m.includes("customer not found")) return "Select a valid customer for this credit sale."
+  if (m.includes("product not found")) return "One of the products is no longer available. Refresh the page and try again."
+  if (m.includes("not authorized") || m.includes("permission")) return "You do not have permission to complete this sale."
+  return "We could not complete the sale. Please try again."
 }
 
 export async function checkout(input: CheckoutInput) {
@@ -32,6 +44,10 @@ export async function checkout(input: CheckoutInput) {
     (line) => !line.product_id || !Number.isInteger(line.quantity) || line.quantity <= 0,
   )
   if (invalidLine) return { error: "Invalid cart quantity" }
+
+  if (input.paymentMethod === "debt" && !input.customerId) {
+    return { error: "Select a customer for credit sales" }
+  }
 
   const { data: organizationId, error: organizationError } = await supabase.rpc(
     "get_or_create_current_organization",
@@ -55,6 +71,7 @@ export async function checkout(input: CheckoutInput) {
       discount: Math.max(0, Number(input.discount) || 0),
       tax: Math.max(0, Number(input.taxRate) || 0),
       payment_method: paymentMethod,
+      due_at: input.paymentMethod === "debt" ? input.dueAt ?? null : null,
       idempotency_key: input.idempotencyKey ?? crypto.randomUUID(),
       items: input.lines.map((line) => ({
         product_id: line.product_id,
@@ -63,7 +80,7 @@ export async function checkout(input: CheckoutInput) {
     },
   })
 
-  if (error || !data) return { error: error?.message ?? "Failed to complete sale" }
+  if (error || !data) return { error: friendlyCheckoutError(error?.message ?? null) }
 
   revalidatePath("/dashboard")
   revalidatePath("/dashboard/pos")

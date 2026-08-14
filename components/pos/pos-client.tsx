@@ -23,6 +23,13 @@ type Product = {
   quantity: number
 }
 
+type Customer = {
+  id: string
+  name: string
+  phone: string | null
+  credit_limit: number
+}
+
 type Line = CartLine & { stock: number }
 
 const PAYMENTS = [
@@ -32,13 +39,19 @@ const PAYMENTS = [
   { value: "debt", label: "Credit", icon: NotebookPen },
 ] as const
 
-export function PosClient({ products }: { products: Product[] }) {
+export function PosClient({ products, customers }: { products: Product[]; customers: Customer[] }) {
   const [query, setQuery] = useState("")
   const [catalog, setCatalog] = useState<Product[]>(products)
   const [cart, setCart] = useState<Line[]>([])
   const [discount, setDiscount] = useState(0)
   const [taxRate, setTaxRate] = useState(0)
   const [payment, setPayment] = useState<(typeof PAYMENTS)[number]["value"]>("cash")
+  const [customerId, setCustomerId] = useState("")
+  const [dueAt, setDueAt] = useState(() => {
+    const d = new Date()
+    d.setDate(d.getDate() + 7)
+    return d.toISOString().slice(0, 10)
+  })
   const [pending, startTransition] = useTransition()
   const [seeding, startSeeding] = useTransition()
   const [offlineCount, setOfflineCount] = useState(0)
@@ -150,13 +163,24 @@ export function PosClient({ products }: { products: Product[] }) {
       toast.error("Cart is empty")
       return
     }
+    if (payment === "debt") {
+      if (!customerId) {
+        toast.error("Select a customer for this credit sale")
+        return
+      }
+      if (!dueAt) {
+        toast.error("Set a due date for this credit sale")
+        return
+      }
+    }
     const idempotencyKey = crypto.randomUUID()
     const payload = {
       lines: cart.map((line) => ({ product_id: line.product_id, product_name: line.product_name, quantity: line.quantity, unit_price: line.unit_price, cost_price: line.cost_price })),
       discount: safeDiscount,
       taxRate: taxRate || 0,
       paymentMethod: payment,
-      customerId: null,
+      customerId: payment === "debt" ? customerId : null,
+      dueAt: payment === "debt" ? new Date(`${dueAt}T23:59:59`).toISOString() : null,
       idempotencyKey,
     }
     startTransition(async () => {
@@ -182,6 +206,7 @@ export function PosClient({ products }: { products: Product[] }) {
       toast.success(`Sale complete - ${res.receiptNumber} (${formatKES(res.total)})`)
       setCart([])
       setDiscount(0)
+      setCustomerId("")
     })
   }
 
@@ -335,6 +360,43 @@ export function PosClient({ products }: { products: Product[] }) {
                 </SelectContent>
               </Select>
             </div>
+
+            {payment === "debt" && (
+              <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/30 p-3">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="credit-customer" className="text-xs">Customer</Label>
+                  {customers.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No customers yet — add one from the Customers page first.</p>
+                  ) : (
+                    <select
+                      id="credit-customer"
+                      value={customerId}
+                      onChange={(e) => setCustomerId(e.target.value)}
+                      className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    >
+                      <option value="">Select a customer...</option>
+                      {customers.map((customer) => (
+                        <option key={customer.id} value={customer.id}>
+                          {customer.name}
+                          {customer.phone ? ` · ${customer.phone}` : ""}
+                          {Number(customer.credit_limit) > 0 ? ` · limit ${formatKES(Number(customer.credit_limit))}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="credit-due" className="text-xs">Due date</Label>
+                  <Input
+                    id="credit-due"
+                    type="date"
+                    value={dueAt}
+                    onChange={(e) => setDueAt(e.target.value)}
+                    disabled={!customerId}
+                  />
+                </div>
+              </div>
+            )}
 
             <div className="mt-auto flex flex-col gap-1.5 border-t border-border pt-3 text-sm">
               <div className="flex justify-between text-muted-foreground">
