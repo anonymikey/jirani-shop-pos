@@ -46,6 +46,7 @@ export function PosClient({ products, customers }: { products: Product[]; custom
   const [discount, setDiscount] = useState(0)
   const [taxRate, setTaxRate] = useState(0)
   const [payment, setPayment] = useState<(typeof PAYMENTS)[number]["value"]>("cash")
+  const [amountPaid, setAmountPaid] = useState(0)
   const [customerId, setCustomerId] = useState("")
   const [dueAt, setDueAt] = useState(() => {
     const d = new Date()
@@ -163,15 +164,17 @@ export function PosClient({ products, customers }: { products: Product[]; custom
       toast.error("Cart is empty")
       return
     }
-    if (payment === "debt") {
-      if (!customerId) {
-        toast.error("Select a customer for this credit sale")
-        return
-      }
-      if (!dueAt) {
-        toast.error("Set a due date for this credit sale")
-        return
-      }
+    if (amountPaid < 0 || amountPaid > total) {
+      toast.error("Amount paid must be between zero and the sale total")
+      return
+    }
+    if (amountPaid < total && !customerId) {
+      toast.error("Select a customer for any sale with an outstanding balance")
+      return
+    }
+    if (amountPaid < total && !dueAt) {
+      toast.error("Set a due date for the outstanding balance")
+      return
     }
     const idempotencyKey = crypto.randomUUID()
     const payload = {
@@ -179,8 +182,9 @@ export function PosClient({ products, customers }: { products: Product[]; custom
       discount: safeDiscount,
       taxRate: taxRate || 0,
       paymentMethod: payment,
-      customerId: payment === "debt" ? customerId : null,
-      dueAt: payment === "debt" ? new Date(`${dueAt}T23:59:59`).toISOString() : null,
+      amountPaid,
+      customerId: amountPaid < total ? customerId : customerId || null,
+      dueAt: amountPaid < total ? new Date(`${dueAt}T23:59:59`).toISOString() : null,
       idempotencyKey,
     }
     startTransition(async () => {
@@ -206,6 +210,7 @@ export function PosClient({ products, customers }: { products: Product[]; custom
       toast.success(`Sale complete - ${res.receiptNumber} (${formatKES(res.total)})`)
       setCart([])
       setDiscount(0)
+      setAmountPaid(0)
       setCustomerId("")
     })
   }
@@ -344,6 +349,23 @@ export function PosClient({ products, customers }: { products: Product[]; custom
             </div>
 
             <div className="grid gap-1.5">
+              <Label htmlFor="amount-paid" className="text-xs">Amount paid</Label>
+              <Input
+                id="amount-paid"
+                type="number"
+                min={0}
+                max={total}
+                step="0.01"
+                value={amountPaid || ""}
+                onChange={(e) => setAmountPaid(Number(e.target.value))}
+                placeholder={formatKES(total)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Outstanding: {formatKES(Math.max(0, total - amountPaid))}
+              </p>
+            </div>
+
+            <div className="grid gap-1.5">
               <Label className="text-xs">Payment method</Label>
               <Select value={payment} onValueChange={(v) => setPayment(v as typeof payment)}>
                 <SelectTrigger>
@@ -361,7 +383,7 @@ export function PosClient({ products, customers }: { products: Product[]; custom
               </Select>
             </div>
 
-            {payment === "debt" && (
+            {amountPaid < total && (
               <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/30 p-3">
                 <div className="grid gap-1.5">
                   <Label htmlFor="credit-customer" className="text-xs">Customer</Label>
