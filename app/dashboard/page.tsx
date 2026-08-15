@@ -23,6 +23,7 @@ import {
   Users,
 } from "lucide-react"
 import Link from "next/link"
+import { DashboardWelcome } from "@/components/dashboard/dashboard-welcome"
 
 function sum(values: number[]) {
   return values.reduce((a, b) => a + b, 0)
@@ -34,8 +35,12 @@ export default async function DashboardPage() {
   const now = new Date()
   const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
   const start7 = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6).toISOString()
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: organizationId } = await supabase.rpc("get_or_create_current_organization")
 
   const [
+    { data: profile },
+    { data: organization },
     { data: sales7 },
     { data: paymentsToday },
     { data: expensesToday },
@@ -45,6 +50,8 @@ export default async function DashboardPage() {
     { data: recent },
     { data: saleItems },
   ] = await Promise.all([
+    user ? supabase.from("profiles").select("full_name").eq("id", user.id).single() : Promise.resolve({ data: null }),
+    organizationId ? supabase.from("organizations").select("name").eq("id", organizationId).single() : Promise.resolve({ data: null }),
     supabase
       .from("sales")
       .select("total, profit, payment_method, created_at")
@@ -144,6 +151,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <DashboardWelcome userName={profile?.full_name ?? user?.user_metadata?.full_name ?? user?.email?.split("@")[0]} shopName={organization?.name} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
