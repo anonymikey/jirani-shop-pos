@@ -1,17 +1,25 @@
 import Image from "next/image"
+import Link from "next/link"
 
-const logoUrl = "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/apple-icon-180x180-zQm6gbophjGA3PqI7UBZJ4VDofV9RR.png"
+const logoUrl = "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/logo-7WiD3SWsCWeBy5C9pB1fd7doEsvUbP.png"
 
 export function BrandMark({ compact = false }: { compact?: boolean }) {
   return (
-    <Image
-      src={logoUrl}
-      alt="JIRANI SHOP SYSTEM"
-      width={compact ? 44 : 180}
-      height={compact ? 44 : 180}
-      className={compact ? "size-9 rounded-md object-cover" : "h-20 w-40 object-contain"}
-      priority
-    />
+    <Link
+      href="/"
+      aria-label="Go to JIRANI SHOP SYSTEM home"
+      className="flex min-w-0 shrink-0 items-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+    >
+      <Image
+        src={logoUrl}
+        alt="JIRANI SHOP SYSTEM"
+        width={compact ? 220 : 520}
+        height={compact ? 110 : 260}
+        sizes={compact ? "(max-width: 640px) 150px, 220px" : "(max-width: 640px) 240px, 520px"}
+        className={compact ? "h-auto max-h-12 w-[min(46vw,220px)] object-contain" : "h-auto w-full max-w-[520px] object-contain"}
+        priority
+      />
+    </Link>
   )
 }
 

@@ -27,10 +27,7 @@ export default async function HomePage() {
   return (
     <main className="flex min-h-svh flex-col bg-background">
       <header className="flex items-center justify-between px-6 py-4">
-        <div className="flex items-center gap-2">
-          <BrandMark compact />
-          <span className="text-lg font-semibold tracking-tight">JIRANI SYSTEM</span>
-        </div>
+        <BrandMark compact />
         <div className="flex items-center gap-2">
           <Button asChild variant="ghost">
             <Link href="/auth/login">Sign in</Link>
