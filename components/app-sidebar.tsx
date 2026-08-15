@@ -10,7 +10,6 @@ import {
   Users,
   BarChart3,
   Settings,
-  Store,
   LogOut,
   Bell,
   UserRound,
@@ -39,6 +38,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { signOut } from "@/app/actions/auth"
+import { BrandMark } from "@/components/brand-mark"
 
 const groups = [
   {
@@ -82,9 +82,7 @@ export function AppSidebar({ name, email, role }: { name: string; email: string;
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex items-center gap-2 px-2 py-1.5">
-          <span className="flex size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-            <Store className="size-4" />
-          </span>
+          <BrandMark compact />
           <div className="flex flex-col">
             <span className="text-sm font-semibold leading-none">JIRANI SYSTEM</span>
             <span className="text-xs text-sidebar-foreground/60">Retail POS</span>

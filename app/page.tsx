@@ -2,7 +2,8 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { Button } from "@/components/ui/button"
-import { Store, BarChart3, ScanLine, Boxes, Users, ArrowRight } from "lucide-react"
+import { BarChart3, ScanLine, Boxes, Users, ArrowRight } from "lucide-react"
+import { BrandMark } from "@/components/brand-mark"
 
 export default async function HomePage() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -27,9 +28,7 @@ export default async function HomePage() {
     <main className="flex min-h-svh flex-col bg-background">
       <header className="flex items-center justify-between px-6 py-4">
         <div className="flex items-center gap-2">
-          <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Store className="size-5" />
-          </span>
+          <BrandMark compact />
           <span className="text-lg font-semibold tracking-tight">JIRANI SYSTEM</span>
         </div>
         <div className="flex items-center gap-2">
