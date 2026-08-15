@@ -20,19 +20,23 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
+        url: 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/favicon-32x32-u2LwRwy8ekrWP44N3hKG9o4KakLVV0.png',
+        sizes: '32x32',
+        type: 'image/png',
       },
       {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
+        url: 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/favicon-16x16-faK2msCUOLuhsg8LMSo0XfgnTFEno5.png',
+        sizes: '16x16',
+        type: 'image/png',
       },
     ],
-    apple: '/apple-icon.png',
+    apple: [
+      {
+        url: 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/apple-icon-180x180-zQm6gbophjGA3PqI7UBZJ4VDofV9RR.png',
+        sizes: '180x180',
+        type: 'image/png',
+      },
+    ],
   },
 }
 
