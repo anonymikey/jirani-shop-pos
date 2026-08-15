@@ -1,7 +1,7 @@
 import Image from "next/image"
 import Link from "next/link"
 
-const logoUrl = "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/apple-icon-precomposed-qrgd3AxrKIiVpa2oKuWcLeTI3FrYzx.png"
+const logoUrl = "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/logo2-u8Qti3mow7YdnpUCH0kl7Y5tBX9A5G.png"
 
 export function BrandMark({ compact = false }: { compact?: boolean }) {
   return (
