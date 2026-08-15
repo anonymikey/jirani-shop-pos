@@ -22,7 +22,7 @@ export function PaymentForm({ customerId, balance }: { customerId: string; balan
       return
     }
     startTransition(async () => {
-      const result = await recordCustomerPayment({ customerId, amount: finalAmount, method })
+      const result = await recordCustomerPayment({ customerId, amount: finalAmount, method, idempotencyKey: crypto.randomUUID() })
       setMessage("error" in result ? result.error ?? "Payment failed" : "Payment recorded")
       if (!("error" in result)) {
         setAmount("")
