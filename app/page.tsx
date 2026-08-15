@@ -71,8 +71,9 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <footer className="border-t border-border px-6 py-6 text-center text-sm text-muted-foreground">
-        {"\u00A9"} {new Date().getFullYear()} JIRANI SYSTEM. All rights reserved.
+      <footer className="border-t border-border px-6 py-8 text-center text-sm text-muted-foreground">
+        <p>{"\u00A9"} {new Date().getFullYear()} JIRANI SYSTEM. All rights reserved.</p>
+        <p className="mt-2 text-xs text-muted-foreground/80">Curated with <span aria-label="love">❤️</span> by ANONYMIKETECH SYSTEMS</p>
       </footer>
     </main>
   )
