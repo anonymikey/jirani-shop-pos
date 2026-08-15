@@ -58,7 +58,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <SidebarTrigger />
           <Separator orientation="vertical" className="h-5" />
           <span className="text-sm font-medium text-muted-foreground">
-            {new Date().toLocaleDateString("en-KE", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+            {new Intl.DateTimeFormat("en-KE", { timeZone: "Africa/Nairobi", weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date())}
           </span>
           <div className="ml-auto"><SyncStatus /></div>
         </header>
