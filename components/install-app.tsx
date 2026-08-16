@@ -29,6 +29,7 @@ export function InstallApp({ compact = false }: { compact?: boolean }) {
   const [promptEvent, setPromptEvent] = useState<BeforeInstallPromptEvent | null>(null)
   const [installed, setInstalled] = useState(() => typeof window !== "undefined" && isStandalone())
   const [device] = useState<DeviceType>(() => typeof window !== "undefined" ? getDeviceType() : "other")
+  const [showInstructions, setShowInstructions] = useState(false)
 
   useEffect(() => {
     const handleBeforeInstall = (event: Event) => {
@@ -58,21 +59,32 @@ export function InstallApp({ compact = false }: { compact?: boolean }) {
   }, [])
 
   async function install() {
-    if (!promptEvent) return
+    if (!promptEvent) {
+      setShowInstructions(true)
+      return
+    }
     await promptEvent.prompt()
     await promptEvent.userChoice
     setPromptEvent(null)
   }
 
+  function instructions() {
+    if (device === "ios") return "In Safari, tap Share, then Add to Home Screen."
+    if (device === "android") return "Open your browser menu, then choose Install app or Add to Home screen."
+    return "Use your browser's install icon in the address bar or open the browser menu and choose Install JIRANI."
+  }
+
   if (installed) return null
 
   if (compact) {
-    if (!promptEvent) return null
     return (
-      <Button type="button" variant="ghost" className="w-full justify-start" onClick={install}>
-        <Download data-icon="inline-start" />
-        Install JIRANI
-      </Button>
+      <>
+        <Button type="button" variant="ghost" className="w-full justify-start" onClick={install}>
+          <Download data-icon="inline-start" />
+          Add JIRANI to Home
+        </Button>
+        {showInstructions && <p className="px-2 pt-2 text-xs leading-relaxed text-muted-foreground">{instructions()}</p>}
+      </>
     )
   }
 
@@ -91,12 +103,15 @@ export function InstallApp({ compact = false }: { compact?: boolean }) {
         <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent>
-        {promptEvent ? (
-          <Button type="button" onClick={install}><Download data-icon="inline-start" /> Install app</Button>
-        ) : isIosDevice ? (
-          <p className="flex items-start gap-2 text-sm text-muted-foreground"><Share className="mt-0.5 size-4 shrink-0 text-primary" />Tap Share in Safari, then choose <span className="font-medium text-foreground">Add to Home Screen</span>.</p>
-        ) : (
-          <p className="text-sm text-muted-foreground">Use your browser&apos;s install icon or menu to add JIRANI to this device.</p>
+        <Button type="button" onClick={install}><Download data-icon="inline-start" /> Add to Home Screen</Button>
+        {showInstructions && (
+          <p className="mt-3 flex items-start gap-2 text-sm text-muted-foreground">
+            {isIosDevice && <Share className="mt-0.5 size-4 shrink-0 text-primary" />}
+            {instructions()}
+          </p>
+        )}
+        {!promptEvent && !showInstructions && (
+          <p className="mt-3 text-xs text-muted-foreground">Your browser will show the install dialog when supported.</p>
         )}
       </CardContent>
     </Card>
