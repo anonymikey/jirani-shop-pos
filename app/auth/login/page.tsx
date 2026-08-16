@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Loader2 } from "lucide-react"
+import { InstallApp } from "@/components/install-app"
 
 function friendlyLoginError(message: string | null): string {
   if (!message) return "We could not sign you in. Please try again."
@@ -95,6 +96,9 @@ function LoginForm() {
             Sign in
           </Button>
         </form>
+        <div className="mt-5 border-t pt-5">
+          <InstallApp />
+        </div>
         <p className="mt-4 text-center text-sm text-muted-foreground">
           {"Don't have an account? "}
           <Link href="/auth/sign-up" className="font-medium text-primary underline-offset-4 hover:underline">
