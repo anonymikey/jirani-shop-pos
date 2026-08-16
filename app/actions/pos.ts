@@ -18,6 +18,7 @@ export type CheckoutInput = {
   paymentMethod: "cash" | "mpesa" | "card" | "debt"
   amountPaid: number
   customerId: string | null
+  customerName?: string | null
   dueAt?: string | null
   idempotencyKey?: string
 }
@@ -69,6 +70,7 @@ export async function checkout(input: CheckoutInput) {
       organization_id: organizationId,
       receipt_number: receiptNumber,
       customer_id: input.customerId,
+      customer_name: input.customerName?.trim() || null,
       discount: Math.max(0, Number(input.discount) || 0),
       tax: Math.max(0, Number(input.taxRate) || 0),
       payment_method: paymentMethod,
@@ -78,6 +80,7 @@ export async function checkout(input: CheckoutInput) {
       items: input.lines.map((line) => ({
         product_id: line.product_id,
         quantity: line.quantity,
+        unit_price: line.unit_price,
       })),
     },
   })
