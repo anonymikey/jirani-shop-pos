@@ -39,6 +39,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { signOut } from "@/app/actions/auth"
 import { BrandMark } from "@/components/brand-mark"
+import { InstallAppLink } from "@/components/install-app"
 
 const groups = [
   {
@@ -136,6 +137,7 @@ export function AppSidebar({ name, email, role }: { name: string; email: string;
               <DropdownMenuItem render={<Link href="/dashboard/settings" />}>
                 <Settings className="mr-2 size-4" /> Settings
               </DropdownMenuItem>
+              <InstallAppLink />
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
