@@ -16,7 +16,9 @@ export type CheckoutInput = {
   discount: number
   taxRate: number
   paymentMethod: "cash" | "mpesa" | "card" | "debt"
+  amountPaid: number
   customerId: string | null
+  customerName?: string | null
   dueAt?: string | null
   idempotencyKey?: string
 }
@@ -45,8 +47,8 @@ export async function checkout(input: CheckoutInput) {
   )
   if (invalidLine) return { error: "Invalid cart quantity" }
 
-  if (input.paymentMethod === "debt" && !input.customerId) {
-    return { error: "Select a customer for credit sales" }
+  if (!Number.isFinite(input.amountPaid) || input.amountPaid < 0) {
+    return { error: "Enter a valid amount paid" }
   }
 
   const { data: organizationId, error: organizationError } = await supabase.rpc(
@@ -68,14 +70,17 @@ export async function checkout(input: CheckoutInput) {
       organization_id: organizationId,
       receipt_number: receiptNumber,
       customer_id: input.customerId,
+      customer_name: input.customerName?.trim() || null,
       discount: Math.max(0, Number(input.discount) || 0),
       tax: Math.max(0, Number(input.taxRate) || 0),
       payment_method: paymentMethod,
-      due_at: input.paymentMethod === "debt" ? input.dueAt ?? null : null,
+      amount_paid: Math.min(Math.max(0, Number(input.amountPaid) || 0), Number.POSITIVE_INFINITY),
+      due_at: input.dueAt ?? null,
       idempotency_key: input.idempotencyKey ?? crypto.randomUUID(),
       items: input.lines.map((line) => ({
         product_id: line.product_id,
         quantity: line.quantity,
+        unit_price: line.unit_price,
       })),
     },
   })

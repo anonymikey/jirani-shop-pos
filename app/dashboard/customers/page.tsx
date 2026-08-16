@@ -1,32 +1,40 @@
 import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { formatKES } from "@/lib/format"
+import { formatEATDate, formatKES } from "@/lib/format"
 import { PaymentForm } from "@/components/customers/payment-form"
+import { CustomerForm } from "@/components/customers/customer-form"
 import { ChevronDown, Phone } from "lucide-react"
 
 export default async function CustomersPage() {
   const supabase = await createClient()
-  const [{ data: customers }, { data: creditSales }, { data: payments }] = await Promise.all([
-    supabase.from("customers").select("id, name, phone, email, credit_limit, status").order("name"),
-    supabase.from("sales").select("customer_id, total, due_at, created_at").eq("payment_method", "credit").eq("status", "completed"),
-    supabase.from("payments").select("customer_id, amount, created_at").not("customer_id", "is", null),
+  const [{ data: customers }, { data: sales }, { data: payments }] = await Promise.all([
+    supabase.from("customers").select("id, name, phone, email, credit_limit, balance, status").order("name"),
+    supabase.from("sales").select("id, customer_id, total, due_at, created_at, status").eq("status", "completed"),
+    supabase.from("payments").select("customer_id, sale_id, amount, payment_type, created_at").not("customer_id", "is", null),
   ])
 
-  const paidByCustomer = new Map<string, number>()
-  for (const payment of payments ?? []) paidByCustomer.set(payment.customer_id, (paidByCustomer.get(payment.customer_id) ?? 0) + Number(payment.amount))
+  const salePaid = new Map<string, number>()
+  const repayments = new Map<string, number>()
+  for (const payment of payments ?? []) {
+    if (payment.payment_type === "debt" || !payment.sale_id) {
+      repayments.set(payment.customer_id, (repayments.get(payment.customer_id) ?? 0) + Number(payment.amount))
+    } else {
+      salePaid.set(payment.sale_id, (salePaid.get(payment.sale_id) ?? 0) + Number(payment.amount))
+    }
+  }
   const debtByCustomer = new Map<string, { balance: number; dueAt: string | null }>()
-  for (const sale of creditSales ?? []) {
+  for (const sale of sales ?? []) {
     if (!sale.customer_id) continue
     const current = debtByCustomer.get(sale.customer_id) ?? { balance: 0, dueAt: null }
-    current.balance += Number(sale.total)
+    current.balance += Math.max(0, Number(sale.total) - (salePaid.get(sale.id) ?? 0))
     if (sale.due_at && (!current.dueAt || sale.due_at < current.dueAt)) current.dueAt = sale.due_at
     debtByCustomer.set(sale.customer_id, current)
   }
 
   const debtors = (customers ?? []).map((customer) => {
     const debt = debtByCustomer.get(customer.id)
-    const balance = Math.max(0, (debt?.balance ?? 0) - (paidByCustomer.get(customer.id) ?? 0))
+    const balance = Math.max(0, (debt?.balance ?? Number(customer.balance) ?? 0) - (repayments.get(customer.id) ?? 0))
     const overdue = Boolean(debt?.dueAt && new Date(debt.dueAt) < new Date() && balance > 0)
     return { ...customer, balance, dueAt: debt?.dueAt ?? null, overdue }
   })
@@ -43,7 +51,6 @@ export default async function CustomersPage() {
           .from("sales")
           .select("id, receipt_number, total, due_at, created_at")
           .eq("customer_id", debtor.id)
-          .eq("payment_method", "credit")
           .eq("status", "completed")
           .order("created_at", { ascending: false })
           .limit(10),
@@ -62,8 +69,10 @@ export default async function CustomersPage() {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Customers &amp; debtors</h1>
-        <p className="text-sm text-muted-foreground">Balances are calculated from credit sales minus recorded payments.</p>
+        <p className="text-sm text-muted-foreground">Balances are calculated from outstanding sale amounts and recorded repayments.</p>
       </div>
+
+      <CustomerForm />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Card>
@@ -116,7 +125,7 @@ export default async function CustomersPage() {
                   {customer.dueAt && customer.balance > 0 && (
                     <p className="text-xs text-muted-foreground">
                       {customer.overdue ? "Overdue since" : "Due by"}{" "}
-                      {new Date(customer.dueAt).toLocaleDateString("en-KE", { day: "numeric", month: "short", year: "numeric" })}
+                      {formatEATDate(customer.dueAt, { dateStyle: "medium" })}
                       {" · "}Remaining balance{" "}
                       <span className="font-semibold text-foreground">{formatKES(customer.balance)}</span>
                       {Number(customer.credit_limit) > 0 && (

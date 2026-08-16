@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { formatKES } from "@/lib/format"
+import { formatEATDate, formatKES } from "@/lib/format"
 import { getPeriodRange, isValidPeriod, PERIOD_LABELS, type PeriodKey } from "@/lib/periods"
 import { PeriodPicker } from "@/components/reports/period-picker"
 import { Banknote, HandCoins, Scale, Smartphone, CreditCard, NotebookPen, Receipt } from "lucide-react"
@@ -31,15 +31,15 @@ export default async function ReportsPage({
   ] = await Promise.all([
     supabase
       .from("sales")
-      .select("total, profit, payment_method")
+      .select("id, total, profit, payment_method")
       .eq("status", "completed")
       .gte("created_at", startISO)
       .lt("created_at", endISO),
-    supabase.from("payments").select("amount").gte("created_at", startISO).lt("created_at", endISO),
+    supabase.from("payments").select("amount, sale_id, payment_type").gte("created_at", startISO).lt("created_at", endISO),
     supabase.from("expenses").select("amount").gte("created_at", startISO).lt("created_at", endISO),
     supabase.from("sale_items").select("cost_price, quantity").gte("created_at", startISO).lt("created_at", endISO),
-    supabase.from("sales").select("total").eq("payment_method", "credit").eq("status", "completed"),
-    supabase.from("payments").select("amount"),
+    supabase.from("sales").select("id, total").eq("status", "completed"),
+    supabase.from("payments").select("amount, sale_id, payment_type"),
   ])
 
   // --- SALES ---
@@ -53,8 +53,8 @@ export default async function ReportsPage({
   const creditSalesInPeriod = byMethod.get("credit") ?? 0
 
   // --- COLLECTIONS ---
-  const collectedFromSales = cashSales + mpesaSales + cardSales
-  const priorDebtPayments = sum((payments ?? []).map((p) => Number(p.amount)))
+  const collectedFromSales = sum((payments ?? []).filter((p) => p.sale_id && p.payment_type !== "debt").map((p) => Number(p.amount)))
+  const priorDebtPayments = sum((payments ?? []).filter((p) => p.payment_type === "debt" || !p.sale_id).map((p) => Number(p.amount)))
   const totalCollected = collectedFromSales + priorDebtPayments
 
   // --- ACCOUNTING ---
@@ -63,14 +63,16 @@ export default async function ReportsPage({
   const expensesTotal = sum((expenses ?? []).map((e) => Number(e.amount)))
   const netProfit = grossProfit - expensesTotal
 
-  const creditSoldAll = sum((creditSales ?? []).map((s) => Number(s.total)))
-  const debtPaidAll = sum((allPayments ?? []).map((p) => Number(p.amount)))
-  const outstandingDebt = Math.max(0, creditSoldAll - debtPaidAll)
+  const salePaidAll = new Map<string, number>()
+  for (const payment of allPayments ?? []) {
+    if (payment.sale_id && payment.payment_type !== "debt") salePaidAll.set(payment.sale_id, (salePaidAll.get(payment.sale_id) ?? 0) + Number(payment.amount))
+  }
+  const outstandingDebt = Math.max(0, sum((creditSales ?? []).map((sale) => Math.max(0, Number(sale.total) - (salePaidAll.get(sale.id) ?? 0)))) - sum((allPayments ?? []).filter((p) => p.payment_type === "debt" || !p.sale_id).map((p) => Number(p.amount))))
 
   const dateLabel =
     period === "custom"
-      ? `${start.toLocaleDateString("en-KE", { day: "numeric", month: "short", year: "numeric" })} – ${end.toLocaleDateString("en-KE", { day: "numeric", month: "short", year: "numeric" })}`
-      : start.toLocaleDateString("en-KE", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
+      ? `${formatEATDate(start, { dateStyle: "medium" })} – ${formatEATDate(end, { dateStyle: "medium" })}`
+      : formatEATDate(start, { weekday: "long", dateStyle: "long" })
 
   const salesRows = [
     { label: "Total sales", value: totalSales, icon: Receipt, bold: true },

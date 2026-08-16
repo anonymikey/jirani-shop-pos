@@ -46,7 +46,10 @@ export function PosClient({ products, customers }: { products: Product[]; custom
   const [discount, setDiscount] = useState(0)
   const [taxRate, setTaxRate] = useState(0)
   const [payment, setPayment] = useState<(typeof PAYMENTS)[number]["value"]>("cash")
+  const [amountPaid, setAmountPaid] = useState(0)
+  const [paidEdited, setPaidEdited] = useState(false)
   const [customerId, setCustomerId] = useState("")
+  const [customerName, setCustomerName] = useState("")
   const [dueAt, setDueAt] = useState(() => {
     const d = new Date()
     d.setDate(d.getDate() + 7)
@@ -119,6 +122,7 @@ export function PosClient({ products, customers }: { products: Product[]; custom
         }
         return prev.map((l) => (l.product_id === p.id ? { ...l, quantity: l.quantity + 1 } : l))
       }
+      if (!paidEdited) setAmountPaid((current) => current + Number(p.selling_price))
       return [
         ...prev,
         {
@@ -157,21 +161,25 @@ export function PosClient({ products, customers }: { products: Product[]; custom
   const taxable = subtotal - safeDiscount
   const tax = Math.round(taxable * ((taxRate || 0) / 100) * 100) / 100
   const total = taxable + tax
+  const debtorQuery = customerName.trim().toLowerCase()
+  const debtorSuggestions = customers.filter((customer) => !debtorQuery || customer.name.toLowerCase().includes(debtorQuery)).slice(0, 6)
 
   function handleCheckout() {
     if (cart.length === 0) {
       toast.error("Cart is empty")
       return
     }
-    if (payment === "debt") {
-      if (!customerId) {
-        toast.error("Select a customer for this credit sale")
-        return
-      }
-      if (!dueAt) {
-        toast.error("Set a due date for this credit sale")
-        return
-      }
+    if (amountPaid < 0 || amountPaid > total) {
+      toast.error("Amount paid must be between zero and the sale total")
+      return
+    }
+    if (amountPaid < total && !customerId && !customerName.trim()) {
+      toast.error("Enter or select the debtor for the outstanding balance")
+      return
+    }
+    if (amountPaid < total && !dueAt) {
+      toast.error("Set a due date for the outstanding balance")
+      return
     }
     const idempotencyKey = crypto.randomUUID()
     const payload = {
@@ -179,8 +187,10 @@ export function PosClient({ products, customers }: { products: Product[]; custom
       discount: safeDiscount,
       taxRate: taxRate || 0,
       paymentMethod: payment,
-      customerId: payment === "debt" ? customerId : null,
-      dueAt: payment === "debt" ? new Date(`${dueAt}T23:59:59`).toISOString() : null,
+      amountPaid,
+      customerId: amountPaid < total ? customerId || null : null,
+      customerName: amountPaid < total ? customerName.trim() || null : null,
+      dueAt: amountPaid < total ? new Date(`${dueAt}T23:59:59`).toISOString() : null,
       idempotencyKey,
     }
     startTransition(async () => {
@@ -206,7 +216,10 @@ export function PosClient({ products, customers }: { products: Product[]; custom
       toast.success(`Sale complete - ${res.receiptNumber} (${formatKES(res.total)})`)
       setCart([])
       setDiscount(0)
+      setAmountPaid(0)
+      setPaidEdited(false)
       setCustomerId("")
+      setCustomerName("")
     })
   }
 
@@ -344,6 +357,23 @@ export function PosClient({ products, customers }: { products: Product[]; custom
             </div>
 
             <div className="grid gap-1.5">
+              <Label htmlFor="amount-paid" className="text-xs">Amount paid</Label>
+              <Input
+                id="amount-paid"
+                type="number"
+                min={0}
+                max={total}
+                step="0.01"
+                value={amountPaid || ""}
+                onChange={(e) => { setPaidEdited(true); setAmountPaid(Number(e.target.value)) }}
+                placeholder={formatKES(total)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Outstanding: {formatKES(Math.max(0, total - amountPaid))}
+              </p>
+            </div>
+
+            <div className="grid gap-1.5">
               <Label className="text-xs">Payment method</Label>
               <Select value={payment} onValueChange={(v) => setPayment(v as typeof payment)}>
                 <SelectTrigger>
@@ -361,28 +391,27 @@ export function PosClient({ products, customers }: { products: Product[]; custom
               </Select>
             </div>
 
-            {payment === "debt" && (
+            {amountPaid < total && (
               <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/30 p-3">
                 <div className="grid gap-1.5">
-                  <Label htmlFor="credit-customer" className="text-xs">Customer</Label>
-                  {customers.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">No customers yet — add one from the Customers page first.</p>
-                  ) : (
-                    <select
-                      id="credit-customer"
-                      value={customerId}
-                      onChange={(e) => setCustomerId(e.target.value)}
-                      className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                    >
-                      <option value="">Select a customer...</option>
-                      {customers.map((customer) => (
-                        <option key={customer.id} value={customer.id}>
-                          {customer.name}
-                          {customer.phone ? ` · ${customer.phone}` : ""}
-                          {Number(customer.credit_limit) > 0 ? ` · limit ${formatKES(Number(customer.credit_limit))}` : ""}
-                        </option>
+                  <Label htmlFor="credit-customer" className="text-xs">Customer / Debtor</Label>
+                  <Input
+                    id="credit-customer"
+                    value={customerName}
+                    onChange={(e) => { setCustomerName(e.target.value); setCustomerId("") }}
+                    placeholder="Who owes the outstanding amount?"
+                    autoFocus
+                  />
+                  {customerId && <p className="text-xs text-muted-foreground">Existing debtor selected.</p>}
+                  {!customerId && customerName.trim() && (
+                    <div className="flex flex-col gap-1 rounded-md border border-border p-1">
+                      {debtorSuggestions.map((customer) => (
+                        <button key={customer.id} type="button" className="flex items-center justify-between rounded px-2 py-1.5 text-left text-sm hover:bg-accent" onClick={() => { setCustomerId(customer.id); setCustomerName(customer.name) }}>
+                          <span>{customer.name}</span><span className="text-xs text-muted-foreground">{formatKES(Number((customer as Customer & { balance?: number }).balance ?? 0))}</span>
+                        </button>
                       ))}
-                    </select>
+                      <p className="px-2 py-1 text-xs text-muted-foreground">{debtorSuggestions.length ? "Select an existing debtor or continue with this name to create one." : "A new debtor will be created at checkout."}</p>
+                    </div>
                   )}
                 </div>
                 <div className="grid gap-1.5">
