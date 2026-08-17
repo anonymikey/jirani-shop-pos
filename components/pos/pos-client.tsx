@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react"
 import { toast } from "sonner"
 import { checkout, seedProducts, type CartLine } from "@/app/actions/pos"
 import { Button } from "@/components/ui/button"
@@ -12,7 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { formatKES } from "@/lib/format"
 import { clearOfflineOperation, getOfflineCatalog, getOfflineOperations, queueOfflineOperation, saveOfflineCatalog, updateOfflineOperation } from "@/lib/offline-queue"
-import { Search, Plus, Minus, Trash2, ShoppingCart, PackageOpen, Banknote, Smartphone, CreditCard, NotebookPen, Loader2 } from "lucide-react"
+import { Search, Plus, Minus, Trash2, ShoppingCart, PackageOpen, Banknote, Smartphone, CreditCard, NotebookPen, Loader2, ArrowDown, Check } from "lucide-react"
 
 type Product = {
   id: string
@@ -58,6 +58,24 @@ export function PosClient({ products, customers }: { products: Product[]; custom
   const [pending, startTransition] = useTransition()
   const [seeding, startSeeding] = useTransition()
   const [offlineCount, setOfflineCount] = useState(0)
+  const [checkoutVisible, setCheckoutVisible] = useState(false)
+  const checkoutRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const checkoutElement = checkoutRef.current
+    if (!checkoutElement) return
+    const observer = new IntersectionObserver(([entry]) => setCheckoutVisible(entry.isIntersecting), { threshold: 0.15 })
+    observer.observe(checkoutElement)
+    return () => observer.disconnect()
+  }, [])
+
+  function continueToCheckout() {
+    const checkoutElement = checkoutRef.current
+    if (!checkoutElement) return
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    checkoutElement.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" })
+    window.setTimeout(() => checkoutElement.focus({ preventScroll: true }), reduceMotion ? 0 : 450)
+  }
 
   const syncOffline = useCallback(async () => {
     if (typeof navigator !== "undefined" && !navigator.onLine) return
@@ -161,6 +179,7 @@ export function PosClient({ products, customers }: { products: Product[]; custom
   const taxable = subtotal - safeDiscount
   const tax = Math.round(taxable * ((taxRate || 0) / 100) * 100) / 100
   const total = taxable + tax
+  const showCheckoutGuide = cart.length > 0 && !checkoutVisible
   const debtorQuery = customerName.trim().toLowerCase()
   const debtorSuggestions = customers.filter((customer) => !debtorQuery || customer.name.toLowerCase().includes(debtorQuery)).slice(0, 6)
 
@@ -235,7 +254,26 @@ export function PosClient({ products, customers }: { products: Product[]; custom
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+    <>
+      {showCheckoutGuide && cart.length > 0 && !checkoutVisible && (
+        <div className="pointer-events-none fixed inset-x-3 bottom-4 z-20 flex justify-center md:inset-x-auto md:right-6 md:w-auto" aria-live="polite">
+          <div className="pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-xl border border-primary/40 bg-card/95 p-3 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-card/85">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+              {cart.length === 1 ? <Check aria-hidden="true" /> : <ShoppingCart aria-hidden="true" />}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold">{cart.length === 1 ? "Product added" : `${cart.length} items in cart`}</p>
+              <p className="text-xs text-muted-foreground">{cart.length === 1 ? "Scroll down to complete the sale" : "Review & complete sale"}</p>
+            </div>
+            <Button type="button" size="sm" onClick={continueToCheckout} aria-label="Continue to checkout">
+              <ArrowDown data-icon="inline-end" aria-hidden="true" />
+              <span className="hidden sm:inline">Continue to checkout</span>
+              <span className="sm:hidden">Checkout</span>
+            </Button>
+          </div>
+        </div>
+      )}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
       {/* Products */}
       <div className="flex flex-col gap-4 lg:col-span-3">
         <div className="relative">
@@ -291,7 +329,7 @@ export function PosClient({ products, customers }: { products: Product[]; custom
       </div>
 
       {/* Cart */}
-      <div className="lg:col-span-2">
+      <div ref={checkoutRef} tabIndex={-1} className="scroll-mt-20 outline-none lg:col-span-2">
         <Card className="flex h-full flex-col">
           <CardContent className="flex flex-1 flex-col gap-4 p-4">
             <div className="flex items-center gap-2">
@@ -453,6 +491,7 @@ export function PosClient({ products, customers }: { products: Product[]; custom
           </CardContent>
         </Card>
       </div>
-    </div>
+      </div>
+    </>
   )
 }
