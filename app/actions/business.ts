@@ -16,7 +16,7 @@ export async function createCustomer(input: { name: string; phone?: string; emai
   const result = await context()
   if ("error" in result) return result
   if (!input.name.trim()) return { error: "Customer name is required" }
-  const { error } = await result.supabase.from("customers").insert({ user_id: result.user.id, organization_id: result.organizationId, name: input.name.trim(), phone: input.phone?.trim() || null, email: input.email?.trim() || null, credit_limit: Math.max(0, Number(input.creditLimit) || 0), balance: 0, status: "active" })
+  const { error } = await result.supabase.from("customers").insert({ user_id: result.user.id, organization_id: result.organizationId, name: input.name.trim(), phone: input.phone?.trim() || null, email: input.email?.trim() || null, credit_limit: Math.max(0, Number(input.creditLimit) || 0), balance: 0 })
   if (error) return { error: "Could not create customer" }
   revalidatePath("/dashboard/customers")
   return { success: true }

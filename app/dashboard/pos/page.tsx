@@ -12,7 +12,6 @@ export default async function PosPage() {
     supabase
       .from("customers")
       .select("id, name, phone, credit_limit")
-      .eq("status", "active")
       .order("name", { ascending: true }),
   ])
 

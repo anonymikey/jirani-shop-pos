@@ -8,6 +8,7 @@ import {
   Boxes,
   Receipt,
   Users,
+  UserRoundPlus,
   BarChart3,
   Settings,
   LogOut,
@@ -58,6 +59,7 @@ const groups = [
     items: [
       { title: "Inventory", href: "/dashboard/inventory", icon: Boxes },
       { title: "Customers", href: "/dashboard/customers", icon: Users },
+      { title: "Debtors", href: "/dashboard/debtors", icon: UserRoundPlus },
       { title: "Reports", href: "/dashboard/reports", icon: BarChart3 },
     ],
   },

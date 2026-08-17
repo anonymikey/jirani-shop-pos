@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type KeyboardEvent } from "react"
 import { toast } from "sonner"
 import { checkout, seedProducts, type CartLine } from "@/app/actions/pos"
 import { Button } from "@/components/ui/button"
@@ -12,7 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { formatKES } from "@/lib/format"
 import { clearOfflineOperation, getOfflineCatalog, getOfflineOperations, queueOfflineOperation, saveOfflineCatalog, updateOfflineOperation } from "@/lib/offline-queue"
-import { Search, Plus, Minus, Trash2, ShoppingCart, PackageOpen, Banknote, Smartphone, CreditCard, NotebookPen, Loader2 } from "lucide-react"
+import { Search, Plus, Minus, Trash2, ShoppingCart, PackageOpen, Banknote, Smartphone, CreditCard, NotebookPen, Loader2, ArrowDown, Check, ChevronDown, X } from "lucide-react"
 
 type Product = {
   id: string
@@ -50,6 +50,11 @@ export function PosClient({ products, customers }: { products: Product[]; custom
   const [paidEdited, setPaidEdited] = useState(false)
   const [customerId, setCustomerId] = useState("")
   const [customerName, setCustomerName] = useState("")
+  const [debtorAttempted, setDebtorAttempted] = useState(false)
+  const [debtorOpen, setDebtorOpen] = useState(false)
+  const [addingDebtor, setAddingDebtor] = useState(false)
+  const [debtorHighlight, setDebtorHighlight] = useState(0)
+  const debtorRef = useRef<HTMLDivElement>(null)
   const [dueAt, setDueAt] = useState(() => {
     const d = new Date()
     d.setDate(d.getDate() + 7)
@@ -58,6 +63,32 @@ export function PosClient({ products, customers }: { products: Product[]; custom
   const [pending, startTransition] = useTransition()
   const [seeding, startSeeding] = useTransition()
   const [offlineCount, setOfflineCount] = useState(0)
+  const [checkoutVisible, setCheckoutVisible] = useState(false)
+  const checkoutRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleOutsideClick(event: MouseEvent) {
+      if (debtorRef.current && !debtorRef.current.contains(event.target as Node)) setDebtorOpen(false)
+    }
+    document.addEventListener("mousedown", handleOutsideClick)
+    return () => document.removeEventListener("mousedown", handleOutsideClick)
+  }, [])
+
+  useEffect(() => {
+    const checkoutElement = checkoutRef.current
+    if (!checkoutElement) return
+    const observer = new IntersectionObserver(([entry]) => setCheckoutVisible(entry.isIntersecting), { threshold: 0.15 })
+    observer.observe(checkoutElement)
+    return () => observer.disconnect()
+  }, [])
+
+  function continueToCheckout() {
+    const checkoutElement = checkoutRef.current
+    if (!checkoutElement) return
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    checkoutElement.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" })
+    window.setTimeout(() => checkoutElement.focus({ preventScroll: true }), reduceMotion ? 0 : 450)
+  }
 
   const syncOffline = useCallback(async () => {
     if (typeof navigator !== "undefined" && !navigator.onLine) return
@@ -161,8 +192,81 @@ export function PosClient({ products, customers }: { products: Product[]; custom
   const taxable = subtotal - safeDiscount
   const tax = Math.round(taxable * ((taxRate || 0) / 100) * 100) / 100
   const total = taxable + tax
+  const outstanding = Math.max(0, total - amountPaid)
+  const showCheckoutGuide = cart.length > 0 && !checkoutVisible
+  const selectedCustomer = customers.find((customer) => customer.id === customerId)
   const debtorQuery = customerName.trim().toLowerCase()
-  const debtorSuggestions = customers.filter((customer) => !debtorQuery || customer.name.toLowerCase().includes(debtorQuery)).slice(0, 6)
+  const debtorSuggestions = customers
+    .filter((customer) => !debtorQuery || customer.name.toLowerCase().includes(debtorQuery) || (customer.phone ?? "").includes(debtorQuery))
+    .sort((a, b) => Number((b as Customer & { balance?: number }).balance ?? 0) - Number((a as Customer & { balance?: number }).balance ?? 0))
+    .slice(0, 6)
+  const debtorNeedsAttention = debtorAttempted && outstanding > 0 && !customerId && !customerName.trim()
+  const checkoutSteps = [
+    { label: "Payment", complete: amountPaid > 0 || total === 0 },
+    { label: "Customer / Debtor", complete: outstanding === 0 || Boolean(customerId || customerName.trim()) },
+    { label: "Due date", complete: outstanding === 0 || Boolean(dueAt) },
+    { label: "Complete sale", complete: false },
+  ]
+  const activeCheckoutStep = outstanding === 0 ? (amountPaid > 0 ? 3 : 0) : !customerId && !customerName.trim() ? 1 : !dueAt ? 2 : 3
+
+  function customerBalance(customer: Customer | undefined) {
+    return Number((customer as (Customer & { balance?: number }) | undefined)?.balance ?? 0)
+  }
+
+  function selectDebtor(customer: Customer) {
+    setCustomerId(customer.id)
+    setCustomerName(customer.name)
+    setDebtorOpen(false)
+    setAddingDebtor(false)
+    setDebtorAttempted(false)
+  }
+
+  function addNewDebtorCandidate() {
+    const normalized = customerName.trim().replace(/\\s+/g, " ")
+    if (!normalized) {
+      setDebtorAttempted(true)
+      return
+    }
+    const existing = customers.find((customer) => customer.name.trim().toLowerCase() === normalized.toLowerCase())
+    if (existing) {
+      selectDebtor(existing)
+      return
+    }
+    setCustomerName(normalized)
+    setCustomerId("")
+    setAddingDebtor(false)
+    setDebtorOpen(false)
+    setDebtorAttempted(false)
+  }
+
+  function handleDebtorKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Escape") {
+      setDebtorOpen(false)
+      return
+    }
+    if (!debtorOpen) {
+      if (event.key === "ArrowDown" || event.key === "Enter") setDebtorOpen(true)
+      return
+    }
+    if (event.key === "ArrowDown") {
+      event.preventDefault()
+      setDebtorHighlight((index) => Math.min(index + 1, Math.max(0, debtorSuggestions.length - 1)))
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault()
+      setDebtorHighlight((index) => Math.max(0, index - 1))
+    } else if (event.key === "Enter" && debtorSuggestions[debtorHighlight]) {
+      event.preventDefault()
+      selectDebtor(debtorSuggestions[debtorHighlight])
+    }
+  }
+
+  function focusDebtorField() {
+    setDebtorAttempted(true)
+    setDebtorOpen(true)
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    debtorRef.current?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" })
+    window.setTimeout(() => document.getElementById("credit-customer")?.focus(), reduceMotion ? 0 : 350)
+  }
 
   function handleCheckout() {
     if (cart.length === 0) {
@@ -173,11 +277,12 @@ export function PosClient({ products, customers }: { products: Product[]; custom
       toast.error("Amount paid must be between zero and the sale total")
       return
     }
-    if (amountPaid < total && !customerId && !customerName.trim()) {
+    if (outstanding > 0 && !customerId && !customerName.trim()) {
+      focusDebtorField()
       toast.error("Enter or select the debtor for the outstanding balance")
       return
     }
-    if (amountPaid < total && !dueAt) {
+    if (outstanding > 0 && !dueAt) {
       toast.error("Set a due date for the outstanding balance")
       return
     }
@@ -188,9 +293,9 @@ export function PosClient({ products, customers }: { products: Product[]; custom
       taxRate: taxRate || 0,
       paymentMethod: payment,
       amountPaid,
-      customerId: amountPaid < total ? customerId || null : null,
-      customerName: amountPaid < total ? customerName.trim() || null : null,
-      dueAt: amountPaid < total ? new Date(`${dueAt}T23:59:59`).toISOString() : null,
+      customerId: outstanding > 0 ? customerId || null : null,
+      customerName: outstanding > 0 ? customerName.trim() || null : null,
+      dueAt: outstanding > 0 ? new Date(`${dueAt}T23:59:59`).toISOString() : null,
       idempotencyKey,
     }
     startTransition(async () => {
@@ -220,6 +325,10 @@ export function PosClient({ products, customers }: { products: Product[]; custom
       setPaidEdited(false)
       setCustomerId("")
       setCustomerName("")
+      setDebtorAttempted(false)
+      setDebtorOpen(false)
+      setAddingDebtor(false)
+      setAddingDebtor(false)
     })
   }
 
@@ -235,7 +344,26 @@ export function PosClient({ products, customers }: { products: Product[]; custom
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+    <>
+      {showCheckoutGuide && cart.length > 0 && !checkoutVisible && (
+        <div className="pointer-events-none fixed inset-x-3 bottom-4 z-20 flex justify-center md:inset-x-auto md:right-6 md:w-auto" aria-live="polite">
+          <div className="pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-xl border border-primary/40 bg-card/95 p-3 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-card/85">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+              {cart.length === 1 ? <Check aria-hidden="true" /> : <ShoppingCart aria-hidden="true" />}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold">{cart.length === 1 ? "Product added" : `${cart.length} items in cart`}</p>
+              <p className="text-xs text-muted-foreground">{cart.length === 1 ? "Scroll down to complete the sale" : "Review & complete sale"}</p>
+            </div>
+            <Button type="button" size="sm" onClick={continueToCheckout} aria-label="Continue to checkout">
+              <ArrowDown data-icon="inline-end" aria-hidden="true" />
+              <span className="hidden sm:inline">Continue to checkout</span>
+              <span className="sm:hidden">Checkout</span>
+            </Button>
+          </div>
+        </div>
+      )}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
       {/* Products */}
       <div className="flex flex-col gap-4 lg:col-span-3">
         <div className="relative">
@@ -291,12 +419,23 @@ export function PosClient({ products, customers }: { products: Product[]; custom
       </div>
 
       {/* Cart */}
-      <div className="lg:col-span-2">
+      <div ref={checkoutRef} tabIndex={-1} className="scroll-mt-20 outline-none lg:col-span-2">
         <Card className="flex h-full flex-col">
           <CardContent className="flex flex-1 flex-col gap-4 p-4">
             <div className="flex items-center gap-2">
               <ShoppingCart className="size-5" />
               <h2 className="font-semibold">Current sale</h2>
+              <Badge variant="outline" className="ml-auto">Step {Math.min(activeCheckoutStep + 1, checkoutSteps.length)} of {checkoutSteps.length}</Badge>
+            </div>
+            <ol className="grid grid-cols-4 gap-1" aria-label="Checkout progress">
+              {checkoutSteps.map((step, index) => (
+                <li key={step.label} className={`flex min-w-0 flex-col gap-1 border-t-2 pt-2 text-[11px] ${step.complete ? "border-primary text-foreground" : index === activeCheckoutStep ? "border-primary/60 text-foreground" : "border-border text-muted-foreground"}`}>
+                  <span className="truncate font-medium">{step.complete ? "Done" : index === activeCheckoutStep ? "Next" : `Step ${index + 1}`}</span>
+                  <span className="truncate">{step.label}</span>
+                </li>
+              ))}
+            </ol>
+            <div className="flex items-center gap-2">
               {cart.length > 0 && <Badge variant="secondary">{cart.length}</Badge>}
               {offlineCount > 0 && <><Badge variant="outline">{offlineCount} awaiting sync</Badge><Button type="button" size="sm" variant="ghost" onClick={() => void syncOffline()}>Sync now</Button></>}
             </div>
@@ -368,8 +507,8 @@ export function PosClient({ products, customers }: { products: Product[]; custom
                 onChange={(e) => { setPaidEdited(true); setAmountPaid(Number(e.target.value)) }}
                 placeholder={formatKES(total)}
               />
-              <p className="text-xs text-muted-foreground">
-                Outstanding: {formatKES(Math.max(0, total - amountPaid))}
+              <p className={`text-xs ${outstanding > 0 ? "text-muted-foreground" : "text-primary"}`}>
+                {outstanding > 0 ? `Outstanding: ${formatKES(outstanding)} · Add a debtor below` : "Paid in full · Ready to complete sale"}
               </p>
             </div>
 
@@ -391,41 +530,84 @@ export function PosClient({ products, customers }: { products: Product[]; custom
               </Select>
             </div>
 
-            {amountPaid < total && (
-              <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/30 p-3">
-                <div className="grid gap-1.5">
-                  <Label htmlFor="credit-customer" className="text-xs">Customer / Debtor</Label>
-                  <Input
-                    id="credit-customer"
-                    value={customerName}
-                    onChange={(e) => { setCustomerName(e.target.value); setCustomerId("") }}
-                    placeholder="Who owes the outstanding amount?"
-                    autoFocus
-                  />
-                  {customerId && <p className="text-xs text-muted-foreground">Existing debtor selected.</p>}
-                  {!customerId && customerName.trim() && (
-                    <div className="flex flex-col gap-1 rounded-md border border-border p-1">
-                      {debtorSuggestions.map((customer) => (
-                        <button key={customer.id} type="button" className="flex items-center justify-between rounded px-2 py-1.5 text-left text-sm hover:bg-accent" onClick={() => { setCustomerId(customer.id); setCustomerName(customer.name) }}>
-                          <span>{customer.name}</span><span className="text-xs text-muted-foreground">{formatKES(Number((customer as Customer & { balance?: number }).balance ?? 0))}</span>
-                        </button>
-                      ))}
-                      <p className="px-2 py-1 text-xs text-muted-foreground">{debtorSuggestions.length ? "Select an existing debtor or continue with this name to create one." : "A new debtor will be created at checkout."}</p>
+            {outstanding > 0 ? (
+              <div className={`flex flex-col gap-3 rounded-lg border border-border bg-muted/30 p-3 ${debtorNeedsAttention ? "debtor-needs-attention" : ""}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <Label htmlFor="credit-customer" className="text-xs">Customer / Debtor</Label>
+                    <p className="mt-1 text-xs text-muted-foreground">Outstanding {formatKES(outstanding)}</p>
+                  </div>
+                  {selectedCustomer && <Badge variant="secondary">Existing</Badge>}
+                </div>
+                {selectedCustomer ? (
+                  <div className="flex flex-col gap-2 rounded-md border border-border bg-card p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-medium">{selectedCustomer.name}</p>
+                      <Button type="button" variant="ghost" size="sm" onClick={() => { setCustomerId(""); setCustomerName(""); setDebtorOpen(true) }}>Change debtor</Button>
                     </div>
-                  )}
-                </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor="credit-due" className="text-xs">Due date</Label>
-                  <Input
-                    id="credit-due"
-                    type="date"
-                    value={dueAt}
-                    onChange={(e) => setDueAt(e.target.value)}
-                    disabled={!customerId}
-                  />
-                </div>
+                    <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
+                      <span>Current debt<strong className="mt-1 block text-foreground">{formatKES(customerBalance(selectedCustomer))}</strong></span>
+                      <span>This sale<strong className="mt-1 block text-foreground">{formatKES(outstanding)}</strong></span>
+                      <span>After sale<strong className="mt-1 block text-foreground">{formatKES(customerBalance(selectedCustomer) + outstanding)}</strong></span>
+                    </div>
+                  </div>
+                ) : (
+                  <div ref={debtorRef} className="relative grid gap-2">
+                    <p className="text-xs font-medium text-primary">{customerName.trim() ? "New debtor will be created at checkout" : "Select a debtor to continue"}</p>
+                    <div className="relative">
+                      <Input
+                        id="credit-customer"
+                        value={customerName}
+                        onChange={(event) => { setCustomerName(event.target.value); setCustomerId(""); setDebtorAttempted(false); setDebtorOpen(true); setDebtorHighlight(0) }}
+                        onFocus={() => setDebtorOpen(true)}
+                        onKeyDown={handleDebtorKeyDown}
+                        placeholder="Select or search debtor"
+                        aria-describedby="credit-customer-help"
+                        aria-controls="debtor-options"
+                        aria-expanded={debtorOpen}
+                        role="combobox"
+                        autoFocus
+                      />
+                      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+                    </div>
+                    {debtorOpen && (
+                      <div id="debtor-options" className="absolute inset-x-0 top-full z-30 mt-1 flex max-h-64 flex-col gap-1 overflow-y-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md" role="listbox" aria-label="Debtor options">
+                        {debtorSuggestions.map((customer, index) => (
+                          <button key={customer.id} type="button" role="option" aria-selected={index === debtorHighlight} className={`flex min-h-12 items-center justify-between gap-3 rounded px-3 py-2 text-left text-sm ${index === debtorHighlight ? "bg-accent" : "hover:bg-accent"}`} onMouseDown={(event) => event.preventDefault()} onClick={() => selectDebtor(customer)}>
+                            <span className="min-w-0"><span className="block truncate">{customer.name}</span>{customer.phone && <span className="block text-xs text-muted-foreground">{customer.phone}</span>}</span>
+                            <span className="shrink-0 text-xs text-muted-foreground">{customerBalance(customer) > 0 ? `Debt ${formatKES(customerBalance(customer))}` : "No outstanding debt"}</span>
+                          </button>
+                        ))}
+                        {debtorSuggestions.length === 0 && customerName.trim() && <p className="px-3 py-2 text-sm text-muted-foreground">No debtor found</p>}
+                        <Button type="button" variant="ghost" className="justify-start gap-2" onMouseDown={(event) => event.preventDefault()} onClick={() => { setAddingDebtor(true); setDebtorOpen(false) }}><Plus data-icon="inline-start" />Add new debtor</Button>
+                      </div>
+                    )}
+                    {addingDebtor && (
+                      <div className="flex flex-col gap-2 rounded-md border border-primary/30 bg-card p-3">
+                        <div className="flex items-center justify-between"><p className="text-sm font-medium">Add new debtor</p><Button type="button" variant="ghost" size="icon" className="size-7" onClick={() => setAddingDebtor(false)} aria-label="Cancel adding debtor"><X /></Button></div>
+                        <Input value={customerName} onChange={(event) => setCustomerName(event.target.value)} placeholder="Debtor name" autoFocus />
+                        <div className="flex justify-end gap-2"><Button type="button" variant="ghost" size="sm" onClick={() => setAddingDebtor(false)}>Cancel</Button><Button type="button" size="sm" onClick={addNewDebtorCandidate}>Add debtor</Button></div>
+                      </div>
+                    )}
+                    <p id="credit-customer-help" className="text-xs text-muted-foreground">{customerName.trim() ? "This debtor will be created automatically when the sale is completed." : "Search by name or phone, or add a new debtor."}</p>
+                  </div>
+                )}
+                <div className="grid gap-1.5"><Label htmlFor="credit-due" className="text-xs">Due date</Label><Input id="credit-due" type="date" value={dueAt} onChange={(e) => setDueAt(e.target.value)} /></div>
+                {debtorNeedsAttention && <p className="text-xs text-destructive" role="alert">Select an existing debtor or enter a name before completing this sale.</p>}
               </div>
+            ) : (
+              <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm text-muted-foreground">Fully paid — no debtor required.</div>
             )}
+
+            <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/20 p-3 text-xs">
+              <div className="flex items-center justify-between"><span className="font-medium">Sale review</span><Badge variant={outstanding > 0 ? "outline" : "secondary"}>{outstanding > 0 ? "Credit sale" : "Paid"}</Badge></div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-muted-foreground">
+                <span>Items <strong className="text-foreground">{cart.reduce((sum, line) => sum + line.quantity, 0)}</strong></span>
+                <span>Paid <strong className="text-foreground">{formatKES(amountPaid)}</strong></span>
+                <span>Customer <strong className="text-foreground">{selectedCustomer?.name ?? (customerName.trim() || "None")}</strong></span>
+                {outstanding > 0 && <span>Due <strong className="text-foreground">{dueAt || "Not set"}</strong></span>}
+              </div>
+            </div>
 
             <div className="mt-auto flex flex-col gap-1.5 border-t border-border pt-3 text-sm">
               <div className="flex justify-between text-muted-foreground">
@@ -448,11 +630,24 @@ export function PosClient({ products, customers }: { products: Product[]; custom
 
             <Button size="lg" onClick={handleCheckout} disabled={pending || cart.length === 0}>
               {pending && <Loader2 className="size-4 animate-spin" />}
-              Complete sale
+              {outstanding > 0 ? "Complete credit sale" : "Complete sale"}
             </Button>
           </CardContent>
         </Card>
+        <style jsx>{`
+          @keyframes debtor-edge-glow {
+            0%, 100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0); }
+            50% { box-shadow: 0 0 0 2px hsl(var(--primary) / 0.35); }
+          }
+          .debtor-needs-attention {
+            animation: debtor-edge-glow 1.8s ease-in-out infinite;
+          }
+          @media (prefers-reduced-motion: reduce) {
+            .debtor-needs-attention { animation: none; }
+          }
+        `}</style>
       </div>
-    </div>
+      </div>
+    </>
   )
 }
