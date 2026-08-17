@@ -201,6 +201,13 @@ export function PosClient({ products, customers }: { products: Product[]; custom
     .sort((a, b) => Number((b as Customer & { balance?: number }).balance ?? 0) - Number((a as Customer & { balance?: number }).balance ?? 0))
     .slice(0, 6)
   const debtorNeedsAttention = debtorAttempted && outstanding > 0 && !customerId && !customerName.trim()
+  const checkoutSteps = [
+    { label: "Payment", complete: amountPaid > 0 || total === 0 },
+    { label: "Customer / Debtor", complete: outstanding === 0 || Boolean(customerId || customerName.trim()) },
+    { label: "Due date", complete: outstanding === 0 || Boolean(dueAt) },
+    { label: "Complete sale", complete: false },
+  ]
+  const activeCheckoutStep = outstanding === 0 ? (amountPaid > 0 ? 3 : 0) : !customerId && !customerName.trim() ? 1 : !dueAt ? 2 : 3
 
   function customerBalance(customer: Customer | undefined) {
     return Number((customer as (Customer & { balance?: number }) | undefined)?.balance ?? 0)
@@ -253,6 +260,14 @@ export function PosClient({ products, customers }: { products: Product[]; custom
     }
   }
 
+  function focusDebtorField() {
+    setDebtorAttempted(true)
+    setDebtorOpen(true)
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    debtorRef.current?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" })
+    window.setTimeout(() => document.getElementById("credit-customer")?.focus(), reduceMotion ? 0 : 350)
+  }
+
   function handleCheckout() {
     if (cart.length === 0) {
       toast.error("Cart is empty")
@@ -263,7 +278,7 @@ export function PosClient({ products, customers }: { products: Product[]; custom
       return
     }
     if (outstanding > 0 && !customerId && !customerName.trim()) {
-      setDebtorAttempted(true)
+      focusDebtorField()
       toast.error("Enter or select the debtor for the outstanding balance")
       return
     }
@@ -312,6 +327,7 @@ export function PosClient({ products, customers }: { products: Product[]; custom
       setCustomerName("")
       setDebtorAttempted(false)
       setDebtorOpen(false)
+      setAddingDebtor(false)
       setAddingDebtor(false)
     })
   }
@@ -409,6 +425,17 @@ export function PosClient({ products, customers }: { products: Product[]; custom
             <div className="flex items-center gap-2">
               <ShoppingCart className="size-5" />
               <h2 className="font-semibold">Current sale</h2>
+              <Badge variant="outline" className="ml-auto">Step {Math.min(activeCheckoutStep + 1, checkoutSteps.length)} of {checkoutSteps.length}</Badge>
+            </div>
+            <ol className="grid grid-cols-4 gap-1" aria-label="Checkout progress">
+              {checkoutSteps.map((step, index) => (
+                <li key={step.label} className={`flex min-w-0 flex-col gap-1 border-t-2 pt-2 text-[11px] ${step.complete ? "border-primary text-foreground" : index === activeCheckoutStep ? "border-primary/60 text-foreground" : "border-border text-muted-foreground"}`}>
+                  <span className="truncate font-medium">{step.complete ? "Done" : index === activeCheckoutStep ? "Next" : `Step ${index + 1}`}</span>
+                  <span className="truncate">{step.label}</span>
+                </li>
+              ))}
+            </ol>
+            <div className="flex items-center gap-2">
               {cart.length > 0 && <Badge variant="secondary">{cart.length}</Badge>}
               {offlineCount > 0 && <><Badge variant="outline">{offlineCount} awaiting sync</Badge><Button type="button" size="sm" variant="ghost" onClick={() => void syncOffline()}>Sync now</Button></>}
             </div>
@@ -480,8 +507,8 @@ export function PosClient({ products, customers }: { products: Product[]; custom
                 onChange={(e) => { setPaidEdited(true); setAmountPaid(Number(e.target.value)) }}
                 placeholder={formatKES(total)}
               />
-              <p className="text-xs text-muted-foreground">
-                Outstanding: {formatKES(outstanding)}
+              <p className={`text-xs ${outstanding > 0 ? "text-muted-foreground" : "text-primary"}`}>
+                {outstanding > 0 ? `Outstanding: ${formatKES(outstanding)} · Add a debtor below` : "Paid in full · Ready to complete sale"}
               </p>
             </div>
 
@@ -526,6 +553,7 @@ export function PosClient({ products, customers }: { products: Product[]; custom
                   </div>
                 ) : (
                   <div ref={debtorRef} className="relative grid gap-2">
+                    <p className="text-xs font-medium text-primary">{customerName.trim() ? "New debtor will be created at checkout" : "Select a debtor to continue"}</p>
                     <div className="relative">
                       <Input
                         id="credit-customer"
@@ -571,6 +599,16 @@ export function PosClient({ products, customers }: { products: Product[]; custom
               <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm text-muted-foreground">Fully paid — no debtor required.</div>
             )}
 
+            <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/20 p-3 text-xs">
+              <div className="flex items-center justify-between"><span className="font-medium">Sale review</span><Badge variant={outstanding > 0 ? "outline" : "secondary"}>{outstanding > 0 ? "Credit sale" : "Paid"}</Badge></div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-muted-foreground">
+                <span>Items <strong className="text-foreground">{cart.reduce((sum, line) => sum + line.quantity, 0)}</strong></span>
+                <span>Paid <strong className="text-foreground">{formatKES(amountPaid)}</strong></span>
+                <span>Customer <strong className="text-foreground">{selectedCustomer?.name ?? (customerName.trim() || "None")}</strong></span>
+                {outstanding > 0 && <span>Due <strong className="text-foreground">{dueAt || "Not set"}</strong></span>}
+              </div>
+            </div>
+
             <div className="mt-auto flex flex-col gap-1.5 border-t border-border pt-3 text-sm">
               <div className="flex justify-between text-muted-foreground">
                 <span>Subtotal</span>
@@ -592,7 +630,7 @@ export function PosClient({ products, customers }: { products: Product[]; custom
 
             <Button size="lg" onClick={handleCheckout} disabled={pending || cart.length === 0}>
               {pending && <Loader2 className="size-4 animate-spin" />}
-              Complete sale
+              {outstanding > 0 ? "Complete credit sale" : "Complete sale"}
             </Button>
           </CardContent>
         </Card>
