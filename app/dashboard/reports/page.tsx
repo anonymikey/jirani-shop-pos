@@ -35,11 +35,11 @@ export default async function ReportsPage({
       .eq("status", "completed")
       .gte("created_at", startISO)
       .lt("created_at", endISO),
-    supabase.from("payments").select("amount, sale_id, payment_type").gte("created_at", startISO).lt("created_at", endISO),
+    supabase.from("payments").select("amount, sale_id, method").gte("created_at", startISO).lt("created_at", endISO),
     supabase.from("expenses").select("amount").gte("created_at", startISO).lt("created_at", endISO),
     supabase.from("sale_items").select("cost_price, quantity").gte("created_at", startISO).lt("created_at", endISO),
     supabase.from("sales").select("id, total").eq("status", "completed"),
-    supabase.from("payments").select("amount, sale_id, payment_type"),
+    supabase.from("payments").select("amount, sale_id, method"),
   ])
 
   // --- SALES ---
@@ -53,8 +53,8 @@ export default async function ReportsPage({
   const creditSalesInPeriod = byMethod.get("credit") ?? 0
 
   // --- COLLECTIONS ---
-  const collectedFromSales = sum((payments ?? []).filter((p) => p.sale_id && p.payment_type !== "debt").map((p) => Number(p.amount)))
-  const priorDebtPayments = sum((payments ?? []).filter((p) => p.payment_type === "debt" || !p.sale_id).map((p) => Number(p.amount)))
+  const collectedFromSales = sum((payments ?? []).filter((p) => p.sale_id && p.method !== "debt").map((p) => Number(p.amount)))
+  const priorDebtPayments = sum((payments ?? []).filter((p) => p.method === "debt" || !p.sale_id).map((p) => Number(p.amount)))
   const totalCollected = collectedFromSales + priorDebtPayments
 
   // --- ACCOUNTING ---
@@ -65,9 +65,9 @@ export default async function ReportsPage({
 
   const salePaidAll = new Map<string, number>()
   for (const payment of allPayments ?? []) {
-    if (payment.sale_id && payment.payment_type !== "debt") salePaidAll.set(payment.sale_id, (salePaidAll.get(payment.sale_id) ?? 0) + Number(payment.amount))
+    if (payment.sale_id && payment.method !== "debt") salePaidAll.set(payment.sale_id, (salePaidAll.get(payment.sale_id) ?? 0) + Number(payment.amount))
   }
-  const outstandingDebt = Math.max(0, sum((creditSales ?? []).map((sale) => Math.max(0, Number(sale.total) - (salePaidAll.get(sale.id) ?? 0)))) - sum((allPayments ?? []).filter((p) => p.payment_type === "debt" || !p.sale_id).map((p) => Number(p.amount))))
+  const outstandingDebt = Math.max(0, sum((creditSales ?? []).map((sale) => Math.max(0, Number(sale.total) - (salePaidAll.get(sale.id) ?? 0)))) - sum((allPayments ?? []).filter((p) => p.method === "debt" || !p.sale_id).map((p) => Number(p.amount))))
 
   const dateLabel =
     period === "custom"
