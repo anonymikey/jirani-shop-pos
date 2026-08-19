@@ -12,10 +12,11 @@ export function formatNumber(n: number) {
 }
 
 export function formatEATDate(value: string | Date, options: Intl.DateTimeFormatOptions = {}) {
+  const granularDateOption = ["weekday", "year", "month", "day", "era"].some((key) => key in options)
+  const { dateStyle: requestedDateStyle, ...rest } = options
   return new Intl.DateTimeFormat("en-KE", {
     timeZone: "Africa/Nairobi",
-    dateStyle: "medium",
-    ...options,
+    ...(granularDateOption ? rest : { dateStyle: requestedDateStyle ?? "medium", ...rest }),
   }).format(new Date(value))
 }
 

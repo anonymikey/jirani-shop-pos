@@ -58,12 +58,7 @@ export async function checkout(input: CheckoutInput) {
     return { error: "Your shop could not be initialized" }
   }
 
-  const paymentMethod =
-    input.paymentMethod === "mpesa"
-      ? "mobile_money"
-      : input.paymentMethod === "debt"
-        ? "credit"
-        : input.paymentMethod
+  const paymentMethod = input.paymentMethod
   const receiptNumber = `JR-${Date.now().toString().slice(-8)}`
   const { data, error } = await supabase.rpc("create_sale_atomic", {
     payload: {
@@ -72,7 +67,7 @@ export async function checkout(input: CheckoutInput) {
       customer_id: input.customerId,
       customer_name: input.customerName?.trim() || null,
       discount: Math.max(0, Number(input.discount) || 0),
-      tax: Math.max(0, Number(input.taxRate) || 0),
+      tax: Math.max(0, Math.round(((Number(input.taxRate) || 0) / 100) * Math.max(0, input.lines.reduce((sum, line) => sum + line.unit_price * line.quantity, 0) - Math.max(0, Number(input.discount) || 0)) * 100) / 100),
       payment_method: paymentMethod,
       amount_paid: Math.min(Math.max(0, Number(input.amountPaid) || 0), Number.POSITIVE_INFINITY),
       due_at: input.dueAt ?? null,

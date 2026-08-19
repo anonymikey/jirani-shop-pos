@@ -3,6 +3,32 @@
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
 
+async function getOrganizationContext() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: "Not authenticated" as const }
+  const { data: organizationId, error } = await supabase.rpc("get_or_create_current_organization")
+  if (error || !organizationId) return { error: "Shop could not be initialized" as const }
+  return { supabase, user, organizationId }
+}
+
+export async function updateDebtDueDate(input: { saleId: string; dueAt: string | null }) {
+  const result = await getOrganizationContext()
+  if ("error" in result) return result
+  if (!input.saleId || (input.dueAt && Number.isNaN(Date.parse(input.dueAt)))) return { error: "Enter a valid due date" }
+  const { error } = await result.supabase.rpc("update_sale_due_date", {
+    payload: {
+      organization_id: result.organizationId,
+      sale_id: input.saleId,
+      due_at: input.dueAt,
+    },
+  })
+  if (error) return { error: error.message?.toLowerCase().includes("paid") ? "Paid sales cannot have a due date" : "Could not update due date" }
+  revalidatePath("/dashboard/debtors")
+  revalidatePath("/dashboard/customers")
+  return { success: true }
+}
+
 export async function recordCustomerPayment(input: { customerId: string; amount: number; method: "cash" | "card" | "mobile_money" | "bank_transfer"; reference?: string; idempotencyKey?: string }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

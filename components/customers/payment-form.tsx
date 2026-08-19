@@ -7,8 +7,9 @@ import { Input } from "@/components/ui/input"
 import { createDebtReminder } from "@/app/actions/notifications"
 import { recordCustomerPayment } from "@/app/actions/debtors"
 import { formatKES } from "@/lib/format"
+import { DebtReminderActions } from "@/components/customers/debt-reminder-actions"
 
-export function PaymentForm({ customerId, balance }: { customerId: string; balance?: number }) {
+export function PaymentForm({ customerId, balance, customerName, phone }: { customerId: string; balance?: number; customerName?: string; phone?: string | null }) {
   const router = useRouter()
   const [amount, setAmount] = useState("")
   const [method, setMethod] = useState<"cash" | "card" | "mobile_money" | "bank_transfer">("cash")
@@ -71,9 +72,11 @@ export function PaymentForm({ customerId, balance }: { customerId: string; balan
           </Button>
         )}
         <Button type="button" size="sm" variant="ghost" onClick={remind} disabled={pending}>
-          Remind
+          Remind staff
         </Button>
       </div>
+      {customerName && <DebtReminderActions name={customerName} phone={phone} balance={remaining} />}
+
       {message && <span className="text-xs text-muted-foreground">{message}</span>}
     </div>
   )
