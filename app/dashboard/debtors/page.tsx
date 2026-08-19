@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { formatEATDate, formatKES } from "@/lib/format"
 import { PaymentForm } from "@/components/customers/payment-form"
+import { DueDateForm } from "@/components/customers/due-date-form"
 import { ChevronDown, CircleDollarSign } from "lucide-react"
 
 export default async function DebtorsPage() {
@@ -71,8 +72,8 @@ export default async function DebtorsPage() {
                   </summary>
                   <div className="mt-4 flex flex-col gap-4 rounded-lg border border-border bg-muted/20 p-4">
                     <div><p className="text-sm font-medium">Debt repayment</p><p className="text-xs text-muted-foreground">Record money received against this customer&apos;s outstanding account.</p></div>
-                    <PaymentForm customerId={customer.id} balance={customer.balance} />
-                    <div className="grid gap-4 lg:grid-cols-2"><div><p className="mb-2 text-xs font-medium text-muted-foreground">Credit history</p>{(saleByCustomer.get(customer.id) ?? []).slice(0, 10).map((sale) => <div key={sale.id} className="flex items-center justify-between border-b border-border py-2 text-xs"><span>{sale.receipt_number || "Credit sale"}<br /><span className="text-muted-foreground">{formatEATDate(sale.created_at, { dateStyle: "medium" })}</span></span><span className="font-medium">{formatKES(Number(sale.total) - (salePaid.get(sale.id) ?? 0))} due</span></div>)}</div><div><p className="mb-2 text-xs font-medium text-muted-foreground">Payments</p>{(paymentByCustomer.get(customer.id) ?? []).slice(0, 10).map((payment) => <div key={payment.id} className="flex items-center justify-between border-b border-border py-2 text-xs"><span className="capitalize">{payment.method.replace("_", " ")}<br /><span className="text-muted-foreground">{formatEATDate(payment.created_at, { dateStyle: "medium" })}</span></span><span className="font-medium">{formatKES(Number(payment.amount))}</span></div>)}</div></div>
+                    <PaymentForm customerId={customer.id} balance={customer.balance} customerName={customer.name} phone={customer.phone} />
+                    <div className="grid gap-4 lg:grid-cols-2"><div><p className="mb-2 text-xs font-medium text-muted-foreground">Credit history</p>{(saleByCustomer.get(customer.id) ?? []).slice(0, 10).map((sale) => <div key={sale.id} className="flex items-center justify-between border-b border-border py-2 text-xs"><span>{sale.receipt_number || "Credit sale"}<br /><span className="text-muted-foreground">{formatEATDate(sale.created_at, { dateStyle: "medium" })}</span><span className="mt-1 block"><DueDateForm saleId={sale.id} dueAt={sale.due_at} /></span></span><span className="font-medium">{formatKES(Number(sale.total) - (salePaid.get(sale.id) ?? 0))} due</span></div>)}</div><div><p className="mb-2 text-xs font-medium text-muted-foreground">Payments</p>{(paymentByCustomer.get(customer.id) ?? []).slice(0, 10).map((payment) => <div key={payment.id} className="flex items-center justify-between border-b border-border py-2 text-xs"><span className="capitalize">{payment.method.replace("_", " ")}<br /><span className="text-muted-foreground">{formatEATDate(payment.created_at, { dateStyle: "medium" })}</span></span><span className="font-medium">{formatKES(Number(payment.amount))}</span></div>)}</div></div>
                   </div>
                 </details>
               ))}

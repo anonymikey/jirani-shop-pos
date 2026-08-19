@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type KeyboardEvent } from "react"
 import { toast } from "sonner"
 import { checkout, seedProducts, type CartLine } from "@/app/actions/pos"
+import { recordCustomerPayment } from "@/app/actions/debtors"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -48,6 +49,7 @@ export function PosClient({ products, customers }: { products: Product[]; custom
   const [payment, setPayment] = useState<(typeof PAYMENTS)[number]["value"]>("cash")
   const [amountPaid, setAmountPaid] = useState(0)
   const [paidEdited, setPaidEdited] = useState(false)
+  const [excessCustomerId, setExcessCustomerId] = useState("")
   const [customerId, setCustomerId] = useState("")
   const [customerName, setCustomerName] = useState("")
   const [debtorAttempted, setDebtorAttempted] = useState(false)
@@ -193,6 +195,7 @@ export function PosClient({ products, customers }: { products: Product[]; custom
   const tax = Math.round(taxable * ((taxRate || 0) / 100) * 100) / 100
   const total = taxable + tax
   const outstanding = Math.max(0, total - amountPaid)
+  const excessAmount = Math.max(0, amountPaid - total)
   const showCheckoutGuide = cart.length > 0 && !checkoutVisible
   const selectedCustomer = customers.find((customer) => customer.id === customerId)
   const debtorQuery = customerName.trim().toLowerCase()
@@ -273,8 +276,12 @@ export function PosClient({ products, customers }: { products: Product[]; custom
       toast.error("Cart is empty")
       return
     }
-    if (amountPaid < 0 || amountPaid > total) {
-      toast.error("Amount paid must be between zero and the sale total")
+    if (amountPaid < 0) {
+      toast.error("Amount paid cannot be negative")
+      return
+    }
+    if (excessAmount > 0 && !excessCustomerId) {
+      toast.error("Choose the debtor whose balance should receive the excess payment")
       return
     }
     if (outstanding > 0 && !customerId && !customerName.trim()) {
@@ -292,7 +299,7 @@ export function PosClient({ products, customers }: { products: Product[]; custom
       discount: safeDiscount,
       taxRate: taxRate || 0,
       paymentMethod: payment,
-      amountPaid,
+      amountPaid: Math.min(amountPaid, total),
       customerId: outstanding > 0 ? customerId || null : null,
       customerName: outstanding > 0 ? customerName.trim() || null : null,
       dueAt: outstanding > 0 ? new Date(`${dueAt}T23:59:59`).toISOString() : null,
@@ -318,11 +325,19 @@ export function PosClient({ products, customers }: { products: Product[]; custom
         toast.error(res.error)
         return
       }
+      if (excessAmount > 0 && excessCustomerId) {
+        const excessResult = await recordCustomerPayment({ customerId: excessCustomerId, amount: excessAmount, method: payment === "mpesa" ? "mobile_money" : payment === "card" ? "card" : "cash", idempotencyKey: `${idempotencyKey}:excess` })
+        if ("error" in excessResult) {
+          toast.error(`Sale completed, but excess payment was not allocated: ${excessResult.error}`)
+          return
+        }
+      }
       toast.success(`Sale complete - ${res.receiptNumber} (${formatKES(res.total)})`)
       setCart([])
       setDiscount(0)
       setAmountPaid(0)
       setPaidEdited(false)
+      setExcessCustomerId("")
       setCustomerId("")
       setCustomerName("")
       setDebtorAttempted(false)
@@ -501,7 +516,6 @@ export function PosClient({ products, customers }: { products: Product[]; custom
                 id="amount-paid"
                 type="number"
                 min={0}
-                max={total}
                 step="0.01"
                 value={amountPaid || ""}
                 onChange={(e) => { setPaidEdited(true); setAmountPaid(Number(e.target.value)) }}
@@ -510,6 +524,16 @@ export function PosClient({ products, customers }: { products: Product[]; custom
               <p className={`text-xs ${outstanding > 0 ? "text-muted-foreground" : "text-primary"}`}>
                 {outstanding > 0 ? `Outstanding: ${formatKES(outstanding)} · Add a debtor below` : "Paid in full · Ready to complete sale"}
               </p>
+              {excessAmount > 0 && (
+                <div className="grid gap-2 rounded-md border border-primary/30 bg-primary/5 p-3">
+                  <p className="text-xs font-medium">Excess payment: {formatKES(excessAmount)}</p>
+                  <p className="text-xs text-muted-foreground">Should this excess amount be applied to a debtor&apos;s balance?</p>
+                  <select aria-label="Debtor for excess payment" value={excessCustomerId} onChange={(event) => setExcessCustomerId(event.target.value)} className="h-9 rounded-md border border-input bg-background px-2 text-sm">
+                    <option value="">Select debtor</option>
+                    {customers.filter((customer) => customer.id !== customerId).map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}
+                  </select>
+                </div>
+              )}
             </div>
 
             <div className="grid gap-1.5">

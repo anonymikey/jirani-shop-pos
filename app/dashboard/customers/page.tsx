@@ -75,7 +75,7 @@ export default async function CustomersPage() {
                       <span>Account balance: <strong className="text-foreground">{formatKES(customer.balance)}</strong></span>
                     </div>
                     {customer.dueAt && customer.balance > 0 && <p className="text-xs text-muted-foreground">{customer.overdue ? "Overdue since" : "Due by"} {formatEATDate(customer.dueAt, { dateStyle: "medium" })}</p>}
-                    {customer.balance > 0 && <PaymentForm customerId={customer.id} balance={customer.balance} />}
+                    {customer.balance > 0 && <PaymentForm customerId={customer.id} balance={customer.balance} customerName={customer.name} phone={customer.phone} />}
                     <p className="text-xs text-muted-foreground">Customer history remains available from this account, while active balances are managed on the Debtors page.</p>
                   </div>
                 </details>
