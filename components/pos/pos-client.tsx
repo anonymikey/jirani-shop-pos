@@ -4,10 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type 
 import { toast } from "sonner"
 import { checkout, seedProducts, type CartLine } from "@/app/actions/pos"
 import { recordCustomerPayment } from "@/app/actions/debtors"
+import { createProduct } from "@/app/actions/inventory"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -67,6 +69,14 @@ export function PosClient({ products, customers }: { products: Product[]; custom
   const [offlineCount, setOfflineCount] = useState(0)
   const [checkoutVisible, setCheckoutVisible] = useState(false)
   const checkoutRef = useRef<HTMLDivElement>(null)
+  const [quickAddOpen, setQuickAddOpen] = useState(false)
+  const [quickAddName, setQuickAddName] = useState("")
+  const [quickAddBrand, setQuickAddBrand] = useState("")
+  const [quickAddCost, setQuickAddCost] = useState("")
+  const [quickAddSelling, setQuickAddSelling] = useState("")
+  const [quickAddQty, setQuickAddQty] = useState("1")
+  const [quickAddSaving, setQuickAddSaving] = useState(false)
+  const [quickAddError, setQuickAddError] = useState("")
 
   useEffect(() => {
     function handleOutsideClick(event: MouseEvent) {
@@ -347,6 +357,80 @@ export function PosClient({ products, customers }: { products: Product[]; custom
     })
   }
 
+  function openQuickAdd() {
+    setQuickAddName(query.trim())
+    setQuickAddBrand("")
+    setQuickAddCost("")
+    setQuickAddSelling("")
+    setQuickAddQty("1")
+    setQuickAddError("")
+    setQuickAddSaving(false)
+    setQuickAddOpen(true)
+  }
+
+  async function handleQuickAdd() {
+    const name = quickAddName.trim()
+    if (!name) {
+      setQuickAddError("Product name is required")
+      return
+    }
+    const costPrice = parseFloat(quickAddCost)
+    const sellingPrice = parseFloat(quickAddSelling)
+    const qty = parseInt(quickAddQty, 10)
+    if (!Number.isFinite(costPrice) || costPrice < 0) {
+      setQuickAddError("Cost price must be a valid number")
+      return
+    }
+    if (!Number.isFinite(sellingPrice) || sellingPrice < 0) {
+      setQuickAddError("Selling price must be a valid number")
+      return
+    }
+    if (!Number.isInteger(qty) || qty < 0) {
+      setQuickAddError("Quantity must be a whole number")
+      return
+    }
+    const duplicate = catalog.find((p) => p.name.toLowerCase() === name.toLowerCase())
+    if (duplicate) {
+      setQuickAddError(`A product named "${duplicate.name}" already exists. Go back and select it instead.`)
+      return
+    }
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setQuickAddError("You\u2019re offline. Connect to the internet to add this product.")
+      return
+    }
+    setQuickAddSaving(true)
+    setQuickAddError("")
+    const result = await createProduct({
+      name,
+      brand: quickAddBrand.trim() || undefined,
+      costPrice,
+      sellingPrice,
+      quantity: qty,
+      reorderLevel: 0,
+    })
+    setQuickAddSaving(false)
+    if ("error" in result) {
+      setQuickAddError(result.error ?? "Could not create product")
+      return
+    }
+    const newProduct: Product = {
+      id: result.productId,
+      name,
+      brand: quickAddBrand.trim() || null,
+      selling_price: sellingPrice,
+      cost_price: costPrice,
+      quantity: qty,
+    }
+    setCatalog((prev) => [...prev, newProduct])
+    setQuickAddOpen(false)
+    if (newProduct.quantity > 0) {
+      addToCart(newProduct)
+      toast.success("Product added")
+    } else {
+      toast.success("Product added (0 stock — add inventory to start selling)")
+    }
+  }
+
   function handleSeed() {
     startSeeding(async () => {
       const res = await seedProducts()
@@ -426,7 +510,21 @@ export function PosClient({ products, customers }: { products: Product[]; custom
                 </div>
               </button>
             ))}
-            {filtered.length === 0 && (
+            {filtered.length === 0 && query.trim() && (
+              <div className="col-span-full flex flex-col items-center gap-3 py-8 text-center">
+                <span className="flex size-10 items-center justify-center rounded-full bg-accent text-accent-foreground">
+                  <PackageOpen className="size-5" />
+                </span>
+                <p className="text-sm font-medium">No product found</p>
+                <p className="max-w-xs text-xs text-muted-foreground">
+                  Add this product to your inventory and continue the sale.
+                </p>
+                <Button variant="outline" size="sm" onClick={openQuickAdd}>
+                  <Plus className="size-4" /> Add {query.trim()}
+                </Button>
+              </div>
+            )}
+            {filtered.length === 0 && !query.trim() && (
               <p className="col-span-full py-8 text-center text-sm text-muted-foreground">No products match.</p>
             )}
           </div>
@@ -672,6 +770,93 @@ export function PosClient({ products, customers }: { products: Product[]; custom
         `}</style>
       </div>
       </div>
+      <Sheet open={quickAddOpen} onOpenChange={setQuickAddOpen}>
+        <SheetContent side="right" className="gap-0 p-0 sm:max-w-sm">
+          <SheetHeader className="border-b border-border p-4">
+            <SheetTitle>Add product</SheetTitle>
+            <SheetDescription>
+              Quick-add &ldquo;{quickAddName}&rdquo; to your inventory.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="flex-1 overflow-y-auto p-4">
+            {quickAddError && (
+              <div className="mb-4 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
+                {quickAddError}
+              </div>
+            )}
+            <div className="grid gap-4">
+              <div className="grid gap-1.5">
+                <Label htmlFor="qa-name">Product name *</Label>
+                <Input
+                  id="qa-name"
+                  value={quickAddName}
+                  onChange={(e) => setQuickAddName(e.target.value)}
+                  placeholder="e.g. Blue Band"
+                  required
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="qa-brand">Brand</Label>
+                <Input
+                  id="qa-brand"
+                  value={quickAddBrand}
+                  onChange={(e) => setQuickAddBrand(e.target.value)}
+                  placeholder="Optional"
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="qa-cost">Cost price (KES) *</Label>
+                <Input
+                  id="qa-cost"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={quickAddCost}
+                  onChange={(e) => setQuickAddCost(e.target.value)}
+                  placeholder="0"
+                  required
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="qa-price">Selling price (KES) *</Label>
+                <Input
+                  id="qa-price"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={quickAddSelling}
+                  onChange={(e) => setQuickAddSelling(e.target.value)}
+                  placeholder="0"
+                  required
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="qa-qty">Quantity *</Label>
+                <Input
+                  id="qa-qty"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={quickAddQty}
+                  onChange={(e) => setQuickAddQty(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+          </div>
+          <SheetFooter className="border-t border-border p-4">
+            <div className="flex w-full gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setQuickAddOpen(false)} disabled={quickAddSaving}>
+                Cancel
+              </Button>
+              <Button className="flex-1" onClick={handleQuickAdd} disabled={quickAddSaving}>
+                {quickAddSaving && <Loader2 className="size-4 animate-spin" />}
+                {quickAddSaving ? "Adding product..." : "Add product"}
+              </Button>
+            </div>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </>
   )
 }
