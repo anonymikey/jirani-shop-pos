@@ -16,8 +16,14 @@ export async function updateDebtDueDate(input: { saleId: string; dueAt: string |
   const result = await getOrganizationContext()
   if ("error" in result) return result
   if (!input.saleId || (input.dueAt && Number.isNaN(Date.parse(input.dueAt)))) return { error: "Enter a valid due date" }
-  const { error } = await result.supabase.from("sales").update({ due_at: input.dueAt || null }).eq("id", input.saleId).eq("organization_id", result.organizationId).not("customer_id", "is", null)
-  if (error) return { error: "Could not update due date" }
+  const { error } = await result.supabase.rpc("update_sale_due_date", {
+    payload: {
+      organization_id: result.organizationId,
+      sale_id: input.saleId,
+      due_at: input.dueAt,
+    },
+  })
+  if (error) return { error: error.message?.toLowerCase().includes("paid") ? "Paid sales cannot have a due date" : "Could not update due date" }
   revalidatePath("/dashboard/debtors")
   revalidatePath("/dashboard/customers")
   return { success: true }
