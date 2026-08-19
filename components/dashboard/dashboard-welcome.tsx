@@ -8,6 +8,7 @@ const EAST_AFRICA_TIME_ZONE = "Africa/Nairobi"
 type DashboardWelcomeProps = {
   userName?: string | null
   shopName?: string | null
+  initialNow: string
 }
 
 function getGreeting(hour: number) {
@@ -33,8 +34,8 @@ function getEastAfricaParts(date: Date) {
   return Object.fromEntries(parts.map(({ type, value }) => [type, value]))
 }
 
-export function DashboardWelcome({ userName, shopName }: DashboardWelcomeProps) {
-  const [now, setNow] = useState(() => new Date())
+export function DashboardWelcome({ userName, shopName, initialNow }: DashboardWelcomeProps) {
+  const [now, setNow] = useState(() => new Date(initialNow))
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 60_000)
