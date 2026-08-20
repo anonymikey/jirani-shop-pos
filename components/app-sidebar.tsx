@@ -72,7 +72,7 @@ const groups = [
   },
 ]
 
-export function AppSidebar({ name, email, role }: { name: string; email: string; role: string }) {
+export function AppSidebar({ name, email, role, unreadNotifications = 0 }: { name: string; email: string; role: string; unreadNotifications?: number }) {
   const pathname = usePathname()
   const initials = (name || email)
     .split(" ")
@@ -98,7 +98,7 @@ export function AppSidebar({ name, email, role }: { name: string; email: string;
                   const active = pathname === item.href
                   return (
                     <SidebarMenuItem key={item.href}>
-                      <SidebarMenuButton render={<Link href={item.href}><item.icon className="size-4" /><span>{item.title}</span></Link>} isActive={active} tooltip={item.title} />
+                      <SidebarMenuButton render={<Link href={item.href}><item.icon className="size-4" /><span>{item.title}</span>{item.title === "Notifications" && unreadNotifications > 0 && <span className="ml-auto flex size-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">{unreadNotifications > 9 ? "9+" : unreadNotifications}</span>}</Link>} isActive={active} tooltip={item.title} />
                     </SidebarMenuItem>
                   )
                 })}

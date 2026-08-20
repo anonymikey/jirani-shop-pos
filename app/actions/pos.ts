@@ -1,6 +1,7 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
+import { notifyOrganization } from "@/app/actions/notification-events"
 import { revalidatePath } from "next/cache"
 
 export type CartLine = {
@@ -91,6 +92,7 @@ export async function checkout(input: CheckoutInput) {
 
   revalidatePath("/dashboard")
   revalidatePath("/dashboard/pos")
+  await notifyOrganization({ organizationId, type: "sale", title: "Sale completed", body: `${receiptNumber} was completed via ${paymentMethod.replace("_", " ")}.` })
   return {
     receiptNumber: data.receipt_number as string,
     total: Number(data.total ?? data.subtotal),

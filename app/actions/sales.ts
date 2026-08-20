@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
+import { notifyOrganization } from "@/app/actions/notification-events"
 
 export async function voidSale(input: { saleId: string; reason?: string }) {
   const supabase = await createClient()
@@ -14,5 +15,6 @@ export async function voidSale(input: { saleId: string; reason?: string }) {
   revalidatePath("/dashboard/sales")
   revalidatePath("/dashboard/reports")
   revalidatePath("/dashboard")
+  await notifyOrganization({ organizationId, type: "sale_voided", title: "Sale voided", body: "A sale was voided and its stock was restored." })
   return { success: true, data }
 }

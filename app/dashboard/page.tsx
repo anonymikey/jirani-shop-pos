@@ -24,6 +24,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { DashboardWelcome } from "@/components/dashboard/dashboard-welcome"
+import { DeveloperNote } from "@/components/dashboard/developer-note"
 
 function sum(values: number[]) {
   return values.reduce((a, b) => a + b, 0)
@@ -152,6 +153,7 @@ export default async function DashboardPage() {
   return (
     <div className="flex flex-col gap-6">
       <DashboardWelcome initialNow={now.toISOString()} userName={profile?.full_name ?? user?.user_metadata?.full_name ?? user?.email?.split("@")[0]} shopName={organization?.name} />
+      <DeveloperNote />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>

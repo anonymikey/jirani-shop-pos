@@ -47,7 +47,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
     redirect("/?error=organization-access")
   }
   if (membership.is_active === false) redirect("/auth/login?error=account-disabled")
-  const { data: profile } = await supabase.from("profiles").select("full_name").eq("id", user.id).single()
+  const [{ data: profile }, { count: unreadNotifications }] = await Promise.all([
+    supabase.from("profiles").select("full_name").eq("id", user.id).single(),
+    supabase.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", user.id).is("read_at", null),
+  ])
 
   return (
     <SidebarProvider>
@@ -55,6 +58,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         name={profile?.full_name ?? ""}
         email={user.email ?? ""}
         role={membership.role ?? "cashier"}
+        unreadNotifications={unreadNotifications ?? 0}
       />
       <SidebarInset>
         <header className="sticky top-0 z-10 flex h-14 items-center gap-2 border-b border-border bg-background/80 px-4 backdrop-blur">

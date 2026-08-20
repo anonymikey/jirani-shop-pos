@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
+import { notifyOrganization } from "@/app/actions/notification-events"
 
 async function context() {
   const supabase = await createClient()
@@ -20,6 +21,7 @@ export async function createCustomer(input: { name: string; phone?: string; emai
   if (error) return { error: "Could not create customer" }
   revalidatePath("/dashboard/customers")
   revalidatePath("/dashboard/debtors")
+  await notifyOrganization({ organizationId: result.organizationId, type: "customer_created", title: "Customer added", body: `${input.name.trim()} was added to customer accounts.` })
   return { success: true }
 }
 
@@ -31,5 +33,6 @@ export async function createExpense(input: { category: string; description?: str
   if (error) return { error: "Could not record expense" }
   revalidatePath("/dashboard/expenses")
   revalidatePath("/dashboard/reports")
+  await notifyOrganization({ organizationId: result.organizationId, type: "expense_recorded", title: "Expense recorded", body: `${input.category.trim()} expense of KSh ${input.amount.toLocaleString("en-KE")} was recorded.` })
   return { success: true }
 }
