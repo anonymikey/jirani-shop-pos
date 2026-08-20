@@ -28,9 +28,16 @@ function friendlyCheckoutError(message: string | null): string {
   const m = message.toLowerCase()
   if (m.includes("credit limit")) return "This customer has reached their credit limit for this sale."
   if (m.includes("insufficient stock")) return "Not enough stock for one of the items. Adjust the quantity and try again."
-  if (m.includes("customer is required") || m.includes("customer not found")) return "Select a valid customer for this credit sale."
+  if (m.includes("customer is required") || m.includes("debtor is required")) return "Select a customer for this outstanding sale."
+  if (m.includes("customer not found") || m.includes("customer is not authorized")) return "The selected customer is not valid for this shop."
   if (m.includes("product not found")) return "One of the products is no longer available. Refresh the page and try again."
+  if (m.includes("price is not approved")) return "The price for one of the products is not approved. Go to Inventory and update the product's selling price, then try again."
   if (m.includes("not authorized") || m.includes("permission")) return "You do not have permission to complete this sale."
+  if (m.includes("amount paid exceeds")) return "The amount paid is more than the sale total."
+  if (m.includes("invalid item quantity") || m.includes("invalid unit price")) return "One of the items has an invalid quantity or price."
+  if (m.includes("unsupported payment method")) return "The selected payment method is not supported."
+  if (m.includes("cart is empty")) return "The cart is empty."
+  if (m.includes("relation") && m.includes("does not exist")) return "A required database table is missing. Please apply migration 0006_jirani_debtor_first_checkout.sql."
   return "We could not complete the sale. Please try again."
 }
 
