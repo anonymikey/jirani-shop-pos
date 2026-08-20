@@ -39,9 +39,11 @@ function isStandalone() {
 export function InstallApp({ compact = false }: { compact?: boolean }) {
   const router = useRouter()
   const [promptEvent, setPromptEvent] = useState<BeforeInstallPromptEvent | null>(null)
-  const [installed, setInstalled] = useState(() => typeof window !== "undefined" && isStandalone())
-  const [device, setDevice] = useState<DeviceType>(() => typeof window !== "undefined" ? getDeviceType() : "other")
-  const [browser, setBrowser] = useState<BrowserType>(() => typeof window !== "undefined" ? getBrowserType() : "other")
+  // Keep the first render identical on the server and client. Browser capabilities
+  // are detected after hydration inside the effect below.
+  const [installed, setInstalled] = useState(false)
+  const [device, setDevice] = useState<DeviceType>("other")
+  const [browser, setBrowser] = useState<BrowserType>("other")
   const [showInstructions, setShowInstructions] = useState(false)
 
   useEffect(() => {
