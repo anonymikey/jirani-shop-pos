@@ -48,6 +48,56 @@ export async function createProduct(input: { name: string; brand?: string; sku?:
   return { productId: product.id }
 }
 
+export async function restockProduct(input: { productId: string }) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: "Not authenticated" }
+  if (!input.productId) return { error: "Product is required" }
+
+  const { data: org, error: orgError } = await supabase.rpc("get_or_create_current_organization")
+  if (orgError || !org) return { error: "Shop could not be initialized" }
+
+  const { data: product } = await supabase
+    .from("products")
+    .select("quantity")
+    .eq("id", input.productId)
+    .eq("organization_id", org)
+    .eq("status", "active")
+    .single()
+  if (!product) return { error: "Product not found in this shop" }
+
+  const currentQuantity = Number(product.quantity)
+  if (!Number.isInteger(currentQuantity) || currentQuantity < 0) return { error: "Product stock is invalid" }
+  const restockQuantity = 100 - currentQuantity
+  if (restockQuantity <= 0) return { quantity: currentQuantity }
+
+  const { error } = await supabase
+    .from("products")
+    .update({ quantity: 100 })
+    .eq("id", input.productId)
+    .eq("organization_id", org)
+    .eq("status", "active")
+  if (error) return { error: "Could not update stock" }
+
+  const { error: movementError } = await supabase.from("inventory_movements").insert({
+    organization_id: org,
+    product_id: input.productId,
+    movement_type: "adjustment",
+    quantity: restockQuantity,
+    note: "Quick restock from Point of Sale",
+    created_by: user.id,
+  })
+  if (movementError) {
+    await supabase.from("products").update({ quantity: currentQuantity }).eq("id", input.productId).eq("organization_id", org)
+    return { error: "Could not record the restock audit, so stock was left unchanged" }
+  }
+
+  revalidatePath("/dashboard/inventory")
+  revalidatePath("/dashboard/pos")
+  revalidatePath("/dashboard")
+  return { quantity: 100 }
+}
+
 export async function adjustInventory(input: { productId: string; quantity: number; note?: string }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
