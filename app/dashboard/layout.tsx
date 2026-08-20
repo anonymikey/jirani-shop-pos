@@ -6,6 +6,9 @@ import { Separator } from "@/components/ui/separator"
 import { SyncStatus } from "@/components/sync-status"
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    redirect("/auth/login?error=supabase-not-configured")
+  }
   const supabase = await createClient()
   const {
     data: { user },

@@ -113,7 +113,7 @@ export async function updateProduct(input: { productId: string; name: string; br
     const { data: supplier } = await supabase.from("suppliers").select("id").eq("id", supplierId).eq("organization_id", org).maybeSingle()
     if (!supplier) return { error: "Supplier not found in this shop" }
   }
-  const { data: product, error } = await supabase.from("products").update({ name, brand: input.brand?.trim() || null, sku: input.sku?.trim() || null, cost_price: input.costPrice, selling_price: input.sellingPrice, reorder_level: input.reorderLevel, supplier_id: supplierId }).eq("id", input.productId).eq("organization_id", org).select("id, selling_price").single()
+  const { data: product, error } = await supabase.from("products").update({ name, brand: input.brand?.trim() || null, sku: input.sku?.trim() || null, cost_price: input.costPrice, selling_price: input.sellingPrice, reorder_level: input.reorderLevel, supplier_id: supplierId }).eq("id", input.productId).eq("organization_id", org).select("id, name, brand, sku, cost_price, selling_price, quantity, reorder_level, supplier_id").single()
   if (error || !product) return { error: error?.code === "23505" ? "That SKU is already in use" : "Could not update product" }
   const { data: currentPrice } = await supabase.from("product_price_options").select("id").eq("organization_id", org).eq("product_id", product.id).eq("unit_price", product.selling_price).eq("is_active", true).maybeSingle()
   if (!currentPrice) {
@@ -121,7 +121,7 @@ export async function updateProduct(input: { productId: string; name: string; br
     if (priceError) return { error: "Product updated, but its approved selling price could not be registered" }
   }
   revalidatePath("/dashboard/inventory"); revalidatePath("/dashboard/pos"); revalidatePath("/dashboard")
-  return { productId: product.id }
+  return { productId: product.id, product }
 }
 
 export async function createSupplier(input: { name: string; phone?: string; notes?: string }) {
@@ -132,7 +132,9 @@ export async function createSupplier(input: { name: string; phone?: string; note
   const { data: org, error: orgError } = await supabase.rpc("get_or_create_current_organization"); if (orgError || !org) return { error: "Shop could not be initialized" }
   const { data, error } = await supabase.from("suppliers").insert({ organization_id: org, name, phone, notes: input.notes?.trim() || null, created_by: user.id }).select("id, name, phone, notes").single()
   if (error || !data) return { error: "Could not add supplier" }
-  revalidatePath("/dashboard/inventory"); return { supplier: data }
+  revalidatePath("/dashboard/inventory")
+  revalidatePath("/dashboard/pos")
+  return { supplier: data }
 }
 
 export async function adjustInventory(input: { productId: string; quantity: number; note?: string }) {
