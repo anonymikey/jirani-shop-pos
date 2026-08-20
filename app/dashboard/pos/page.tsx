@@ -11,7 +11,7 @@ export default async function PosPage() {
       .order("name", { ascending: true }),
     supabase
       .from("customers")
-      .select("id, name, phone, credit_limit")
+      .select("id, name, phone, credit_limit, balance")
       .order("name", { ascending: true }),
   ])
 

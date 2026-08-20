@@ -48,6 +48,93 @@ export async function createProduct(input: { name: string; brand?: string; sku?:
   return { productId: product.id }
 }
 
+export async function restockProduct(input: { productId: string }) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: "Not authenticated" }
+  if (!input.productId) return { error: "Product is required" }
+
+  const { data: org, error: orgError } = await supabase.rpc("get_or_create_current_organization")
+  if (orgError || !org) return { error: "Shop could not be initialized" }
+
+  const { data: product } = await supabase
+    .from("products")
+    .select("quantity")
+    .eq("id", input.productId)
+    .eq("organization_id", org)
+    .eq("status", "active")
+    .single()
+  if (!product) return { error: "Product not found in this shop" }
+
+  const currentQuantity = Number(product.quantity)
+  if (!Number.isInteger(currentQuantity) || currentQuantity < 0) return { error: "Product stock is invalid" }
+  const restockQuantity = 100 - currentQuantity
+  if (restockQuantity <= 0) return { quantity: currentQuantity }
+
+  const { error } = await supabase
+    .from("products")
+    .update({ quantity: 100 })
+    .eq("id", input.productId)
+    .eq("organization_id", org)
+    .eq("status", "active")
+  if (error) return { error: "Could not update stock" }
+
+  const { error: movementError } = await supabase.from("inventory_movements").insert({
+    organization_id: org,
+    product_id: input.productId,
+    movement_type: "adjustment",
+    quantity: restockQuantity,
+    note: "Quick restock from Point of Sale",
+    created_by: user.id,
+  })
+  if (movementError) {
+    await supabase.from("products").update({ quantity: currentQuantity }).eq("id", input.productId).eq("organization_id", org)
+    return { error: "Could not record the restock audit, so stock was left unchanged" }
+  }
+
+  revalidatePath("/dashboard/inventory")
+  revalidatePath("/dashboard/pos")
+  revalidatePath("/dashboard")
+  return { quantity: 100 }
+}
+
+export async function updateProduct(input: { productId: string; name: string; brand?: string; sku?: string; costPrice: number; sellingPrice: number; reorderLevel: number; supplierId?: string | null }) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: "Not authenticated" }
+  const name = input.name.trim()
+  if (!input.productId || !name) return { error: "Product name is required" }
+  if (![input.costPrice, input.sellingPrice].every((value) => Number.isFinite(value) && value >= 0)) return { error: "Prices cannot be negative" }
+  if (!Number.isInteger(input.reorderLevel) || input.reorderLevel < 0) return { error: "Reorder level must be a whole number" }
+  const { data: org, error: orgError } = await supabase.rpc("get_or_create_current_organization")
+  if (orgError || !org) return { error: "Shop could not be initialized" }
+  const supplierId: string | null = input.supplierId || null
+  if (supplierId) {
+    const { data: supplier } = await supabase.from("suppliers").select("id").eq("id", supplierId).eq("organization_id", org).maybeSingle()
+    if (!supplier) return { error: "Supplier not found in this shop" }
+  }
+  const { data: product, error } = await supabase.from("products").update({ name, brand: input.brand?.trim() || null, sku: input.sku?.trim() || null, cost_price: input.costPrice, selling_price: input.sellingPrice, reorder_level: input.reorderLevel, supplier_id: supplierId }).eq("id", input.productId).eq("organization_id", org).select("id, selling_price").single()
+  if (error || !product) return { error: error?.code === "23505" ? "That SKU is already in use" : "Could not update product" }
+  const { data: currentPrice } = await supabase.from("product_price_options").select("id").eq("organization_id", org).eq("product_id", product.id).eq("unit_price", product.selling_price).eq("is_active", true).maybeSingle()
+  if (!currentPrice) {
+    const { error: priceError } = await supabase.from("product_price_options").insert({ organization_id: org, product_id: product.id, unit_price: product.selling_price, is_active: true, created_by: user.id })
+    if (priceError) return { error: "Product updated, but its approved selling price could not be registered" }
+  }
+  revalidatePath("/dashboard/inventory"); revalidatePath("/dashboard/pos"); revalidatePath("/dashboard")
+  return { productId: product.id }
+}
+
+export async function createSupplier(input: { name: string; phone?: string; notes?: string }) {
+  const supabase = await createClient(); const { data: { user } } = await supabase.auth.getUser(); if (!user) return { error: "Not authenticated" }
+  const name = input.name.trim(); const phone = input.phone?.trim() || null
+  if (!name) return { error: "Supplier name is required" }
+  if (phone && !/^[+0-9()\s-]{7,24}$/.test(phone)) return { error: "Enter a valid supplier phone number" }
+  const { data: org, error: orgError } = await supabase.rpc("get_or_create_current_organization"); if (orgError || !org) return { error: "Shop could not be initialized" }
+  const { data, error } = await supabase.from("suppliers").insert({ organization_id: org, name, phone, notes: input.notes?.trim() || null, created_by: user.id }).select("id, name, phone, notes").single()
+  if (error || !data) return { error: "Could not add supplier" }
+  revalidatePath("/dashboard/inventory"); return { supplier: data }
+}
+
 export async function adjustInventory(input: { productId: string; quantity: number; note?: string }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

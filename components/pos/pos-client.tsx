@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type 
 import { toast } from "sonner"
 import { checkout, seedProducts, type CartLine } from "@/app/actions/pos"
 import { recordCustomerPayment } from "@/app/actions/debtors"
-import { createProduct } from "@/app/actions/inventory"
+import { createProduct, restockProduct } from "@/app/actions/inventory"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -31,6 +31,7 @@ type Customer = {
   name: string
   phone: string | null
   credit_limit: number
+  balance: number
 }
 
 type Line = CartLine & { stock: number }
@@ -77,6 +78,20 @@ export function PosClient({ products, customers }: { products: Product[]; custom
   const [quickAddQty, setQuickAddQty] = useState("1")
   const [quickAddSaving, setQuickAddSaving] = useState(false)
   const [quickAddError, setQuickAddError] = useState("")
+  const [restockingProductId, setRestockingProductId] = useState<string | null>(null)
+
+  async function handleRestock(product: Product) {
+    if (restockingProductId) return
+    setRestockingProductId(product.id)
+    const result = await restockProduct({ productId: product.id })
+    setRestockingProductId(null)
+    if ("error" in result) {
+      toast.error(result.error ?? "Could not restock product")
+      return
+    }
+    setCatalog((current) => current.map((item) => item.id === product.id ? { ...item, quantity: result.quantity ?? 100 } : item))
+    toast.success(`${product.name} restocked to 100`)
+  }
 
   useEffect(() => {
     function handleOutsideClick(event: MouseEvent) {
@@ -494,21 +509,36 @@ export function PosClient({ products, customers }: { products: Product[]; custom
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {filtered.map((p) => (
-              <button
+              <div
                 key={p.id}
-                onClick={() => addToCart(p)}
-                disabled={p.quantity <= 0}
-                className="flex flex-col rounded-xl border border-border bg-card p-3 text-left transition-colors hover:border-primary/50 hover:bg-accent/40 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={() => p.quantity > 0 && addToCart(p)}
+                className={`flex flex-col rounded-xl border border-border bg-card p-3 text-left transition-colors ${p.quantity > 0 ? "cursor-pointer hover:border-primary/50 hover:bg-accent/40" : ""}`}
               >
                 <span className="line-clamp-2 text-sm font-medium">{p.name}</span>
                 {p.brand && <span className="text-xs text-muted-foreground">{p.brand}</span>}
-                <div className="mt-2 flex items-center justify-between">
+                <div className="mt-2 flex items-center justify-between gap-2">
                   <span className="text-sm font-semibold">{formatKES(Number(p.selling_price))}</span>
                   <Badge variant={p.quantity <= 0 ? "destructive" : "secondary"} className="text-xs">
                     {p.quantity <= 0 ? "Out" : `${p.quantity}`}
                   </Badge>
                 </div>
-              </button>
+                {p.quantity <= 0 && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="mt-3 w-full"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      void handleRestock(p)
+                    }}
+                    disabled={restockingProductId === p.id}
+                  >
+                    {restockingProductId === p.id && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
+                    {restockingProductId === p.id ? "Restocking..." : "Restock to 100"}
+                  </Button>
+                )}
+              </div>
             ))}
             {filtered.length === 0 && query.trim() && (
               <div className="col-span-full flex flex-col items-center gap-3 py-8 text-center">
