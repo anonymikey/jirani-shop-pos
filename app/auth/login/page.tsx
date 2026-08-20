@@ -46,6 +46,11 @@ function LoginForm() {
     setLoading(true)
     setError(null)
     const supabase = createClient()
+    if (!supabase) {
+      setError("Sign-in is unavailable until Supabase is configured for this project.")
+      setLoading(false)
+      return
+    }
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
       setError(friendlyLoginError(error.message))
