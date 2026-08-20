@@ -25,6 +25,11 @@ export default function SignUpPage() {
     setLoading(true)
     setError(null)
     const supabase = createClient()
+    if (!supabase) {
+      setError("Account creation is unavailable until Supabase is configured for this project.")
+      setLoading(false)
+      return
+    }
     const { data: canRegister, error: gateError } = await supabase.rpc("can_register_new_user")
     if (gateError || canRegister !== true) {
       setError("New account registration is currently closed. Ask your shop administrator for an invite.")
