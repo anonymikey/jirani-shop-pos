@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
+import { notifyOrganization } from "@/app/actions/notification-events"
 
 async function context() {
   const supabase = await createClient()
@@ -19,6 +20,8 @@ export async function createCustomer(input: { name: string; phone?: string; emai
   const { error } = await result.supabase.from("customers").insert({ user_id: result.user.id, organization_id: result.organizationId, name: input.name.trim(), phone: input.phone?.trim() || null, email: input.email?.trim() || null, credit_limit: Math.max(0, Number(input.creditLimit) || 0), balance: 0 })
   if (error) return { error: "Could not create customer" }
   revalidatePath("/dashboard/customers")
+  revalidatePath("/dashboard/debtors")
+  await notifyOrganization({ organizationId: result.organizationId, type: "customer_created", title: "Customer added", body: `${input.name.trim()} was added to customer accounts.` })
   return { success: true }
 }
 
@@ -30,5 +33,6 @@ export async function createExpense(input: { category: string; description?: str
   if (error) return { error: "Could not record expense" }
   revalidatePath("/dashboard/expenses")
   revalidatePath("/dashboard/reports")
+  await notifyOrganization({ organizationId: result.organizationId, type: "expense_recorded", title: "Expense recorded", body: `${input.category.trim()} expense of KSh ${input.amount.toLocaleString("en-KE")} was recorded.` })
   return { success: true }
 }
