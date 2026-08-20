@@ -31,6 +31,7 @@ type Customer = {
   name: string
   phone: string | null
   credit_limit: number
+  balance: number
 }
 
 type Line = CartLine & { stock: number }

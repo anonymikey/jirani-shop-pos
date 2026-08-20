@@ -120,7 +120,11 @@ export async function seedProducts() {
   } = await supabase.auth.getUser()
   if (!user) return { error: "Not authenticated" }
 
+  const { data: organizationId, error: organizationError } = await supabase.rpc("get_or_create_current_organization")
+  if (organizationError || !organizationId) return { error: "Shop could not be initialized" }
+
   const rows = SAMPLE.map((p) => ({
+    organization_id: organizationId,
     user_id: user.id,
     name: p.name,
     brand: p.brand,
@@ -132,8 +136,23 @@ export async function seedProducts() {
     status: "active",
   }))
 
-  const { error } = await supabase.from("products").insert(rows)
-  if (error) return { error: error.message }
+  const { data: products, error } = await supabase.from("products").insert(rows).select("id, selling_price")
+  if (error || !products?.length) return { error: error?.code === "23505" ? "Some sample products already exist" : "Could not add sample products" }
+
+  const prices = products.map((product) => ({
+    organization_id: organizationId,
+    product_id: product.id,
+    unit_price: product.selling_price,
+    is_active: true,
+    created_by: user.id,
+  }))
+  const { error: priceError } = await supabase.from("product_price_options").insert(prices)
+  if (priceError) {
+    await supabase.from("products").delete().eq("organization_id", organizationId).in("id", products.map((product) => product.id))
+    if (priceError.code === "42P01") return { error: "The approved-price table is missing. Apply the checkout database migration, then try again." }
+    console.error("[JIRANI] seed price registration failed:", priceError.code, priceError.message)
+    return { error: "Sample products could not be prepared for checkout" }
+  }
 
   revalidatePath("/dashboard/pos")
   revalidatePath("/dashboard")
