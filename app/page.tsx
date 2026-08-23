@@ -3,8 +3,9 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { Button } from "@/components/ui/button"
 import { BarChart3, ScanLine, Boxes, Users, ArrowRight, Zap, Shield, Smartphone, TrendingUp, CreditCard, Clock, ChevronRight } from "lucide-react"
-import { BrandMark } from "@/components/brand-mark"
 import { AnimatedBubbles } from "@/components/landing/animated-bubbles"
+import { LandingHeader } from "@/components/landing/landing-header"
+import { BrandMark } from "@/components/brand-mark"
 import { ScrollReveal, ParallaxFloat } from "@/components/landing/gsap-scroll-reveal"
 
 export default async function HomePage() {
@@ -33,19 +34,7 @@ export default async function HomePage() {
       <AnimatedBubbles />
 
       {/* Header */}
-      <header className="landing-header">
-        <BrandMark compact />
-        <nav className="landing-nav">
-          <a href="#features" className="landing-nav-item">Features</a>
-          <a href="#how-it-works" className="landing-nav-item">How It Works</a>
-          <Link href="/auth/login" className="landing-nav-item">Sign In</Link>
-        </nav>
-        <Button asChild className="landing-cta-btn">
-          <Link href="/auth/login">
-            Open My Shop <ArrowRight className="size-4" />
-          </Link>
-        </Button>
-      </header>
+      <LandingHeader />
 
       {/* Hero */}
       <section className="landing-hero">

@@ -426,6 +426,42 @@
   color: white;
 }
 
+/* Hamburger button */
+.landing-hamburger {
+  color: white !important;
+}
+
+/* Mobile menu (Sheet overlay) */
+.landing-mobile-menu {
+  background: #0a1a14 !important;
+  border-left: 1px solid rgba(34, 197, 94, 0.12) !important;
+}
+
+.landing-mobile-menu [data-slot="sheet-close"] {
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+
+.landing-mobile-menu [data-slot="sheet-close"]:hover {
+  color: white !important;
+}
+
+.landing-mobile-nav-item {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  text-decoration: none;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.landing-mobile-nav-item:hover {
+  background: rgba(34, 197, 94, 0.12);
+  color: white;
+}
+
 .landing-cta-btn {
   border-radius: 100px !important;
   background: rgba(34, 197, 94, 0.9) !important;
