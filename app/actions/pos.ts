@@ -48,16 +48,17 @@ export async function checkout(input: CheckoutInput) {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return { error: "Not authenticated" }
-  if (input.lines.length === 0) return { error: "Cart is empty" }
+  if (!Array.isArray(input.lines) || input.lines.length === 0 || input.lines.length > 100) return { error: "Cart is empty or too large" }
 
   const invalidLine = input.lines.find(
-    (line) => !line.product_id || !Number.isInteger(line.quantity) || line.quantity <= 0,
+    (line) => !/^[0-9a-f-]{36}$/i.test(line.product_id) || !Number.isInteger(line.quantity) || line.quantity <= 0 || line.quantity > 10000 || !Number.isFinite(line.unit_price) || line.unit_price < 0,
   )
-  if (invalidLine) return { error: "Invalid cart quantity" }
-
-  if (!Number.isFinite(input.amountPaid) || input.amountPaid < 0) {
-    return { error: "Enter a valid amount paid" }
-  }
+  if (invalidLine) return { error: "Invalid cart item" }
+  if (!Number.isFinite(input.discount) || input.discount < 0 || !Number.isFinite(input.taxRate) || input.taxRate < 0 || input.taxRate > 100) return { error: "Enter valid discount and tax values" }
+  if (!Number.isFinite(input.amountPaid) || input.amountPaid < 0) return { error: "Enter a valid amount paid" }
+  if (input.customerId && !/^[0-9a-f-]{36}$/i.test(input.customerId)) return { error: "The selected customer is not valid" }
+  if (input.customerName && input.customerName.trim().length > 120) return { error: "Customer name is too long" }
+  if (input.dueAt && Number.isNaN(Date.parse(input.dueAt))) return { error: "Enter a valid due date" }
 
   const { data: organizationId, error: organizationError } = await supabase.rpc(
     "get_or_create_current_organization",

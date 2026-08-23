@@ -28,6 +28,25 @@ async function isLastActiveAdmin(supabase: Awaited<ReturnType<typeof createClien
   return active.length <= 1
 }
 
+export async function requireManager() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: "Not authenticated" as const }
+  const { data: organizationId, error } = await supabase.rpc("get_or_create_current_organization")
+  if (error || !organizationId) return { error: "Shop could not be initialized" as const }
+  const { data: member } = await supabase
+    .from("organization_members")
+    .select("role")
+    .eq("organization_id", organizationId)
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+    .single()
+  if (!member || !["owner", "admin", "manager", "accountant"].includes(member.role)) {
+    return { error: "Only a manager can perform this action" as const }
+  }
+  return { supabase, user, organizationId }
+}
+
 export async function updateRegistrationAccess(formData: FormData) {
   const result = await adminContext()
   if ("error" in result) return

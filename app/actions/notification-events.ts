@@ -7,7 +7,12 @@ type NotificationInput = { type: string; title: string; body: string }
 
 export async function notifyOrganization(input: NotificationInput & { organizationId: string }) {
   try {
+    if (!/^[0-9a-f-]{36}$/i.test(input.organizationId) || !input.type || input.type.length > 60 || !input.title || input.title.length > 160 || !input.body || input.body.length > 1000) return
     const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data: membership } = await supabase.from("organization_members").select("user_id").eq("organization_id", input.organizationId).eq("user_id", user.id).eq("is_active", true).maybeSingle()
+    if (!membership) return
     const { data: members } = await supabase
       .from("organization_members")
       .select("user_id")

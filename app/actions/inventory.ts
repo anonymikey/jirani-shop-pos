@@ -2,11 +2,14 @@
 
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
+import { requireManager } from "@/app/actions/access"
 
 export async function createProduct(input: { name: string; brand?: string; sku?: string; costPrice: number; sellingPrice: number; quantity: number; reorderLevel: number }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: "Not authenticated" }
+  const access = await requireManager()
+  if ("error" in access) return { error: access.error }
   const name = input.name.trim()
   if (!name) return { error: "Product name is required" }
   if (![input.costPrice, input.sellingPrice].every((value) => Number.isFinite(value) && value >= 0)) return { error: "Prices cannot be negative" }
@@ -102,6 +105,8 @@ export async function updateProduct(input: { productId: string; name: string; br
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: "Not authenticated" }
+  const access = await requireManager()
+  if ("error" in access) return { error: access.error }
   const name = input.name.trim()
   if (!input.productId || !name) return { error: "Product name is required" }
   if (![input.costPrice, input.sellingPrice].every((value) => Number.isFinite(value) && value >= 0)) return { error: "Prices cannot be negative" }
@@ -141,6 +146,8 @@ export async function adjustInventory(input: { productId: string; quantity: numb
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: "Not authenticated" }
+  const access = await requireManager()
+  if ("error" in access) return { error: access.error }
   if (!Number.isInteger(input.quantity) || input.quantity === 0) return { error: "Enter a non-zero whole number" }
 
   const { data: org, error: orgError } = await supabase.rpc("get_or_create_current_organization")
