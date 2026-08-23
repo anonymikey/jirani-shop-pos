@@ -5,7 +5,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { BrandMark } from "@/components/brand-mark"
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
-import { ArrowRight, Menu } from "lucide-react"
+import { ArrowRight } from "lucide-react"
 
 const navLinks = [
   { href: "#features", label: "Features" },
@@ -39,11 +39,24 @@ export function LandingHeader() {
       {/* Mobile hamburger — visible only on small screens */}
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger
-          render={<Button variant="ghost" size="icon" className="landing-hamburger md:hidden" aria-label="Open menu" />}
+          render={
+            <Button
+              variant="ghost"
+              size="icon"
+              className="landing-hamburger md:hidden"
+              aria-label={open ? "Close menu" : "Open menu"}
+              aria-expanded={open}
+              aria-controls="landing-mobile-menu"
+            />
+          }
         >
-          <Menu className="size-5 text-white" />
+          <span className="landing-hamburger__icon" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </span>
         </SheetTrigger>
-        <SheetContent side="right" className="landing-mobile-menu w-72 sm:w-80" showCloseButton>
+        <SheetContent id="landing-mobile-menu" side="right" className="landing-mobile-menu w-72 sm:w-80" showCloseButton>
           <SheetTitle className="sr-only">Navigation</SheetTitle>
           <nav className="flex flex-col gap-1 mt-10">
             {navLinks.map((link) => (
