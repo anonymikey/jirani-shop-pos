@@ -1,22 +1,17 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { createClient } from "@/lib/supabase/server"
 import { notifyOrganization } from "@/app/actions/notification-events"
+import { getOrganizationContext, hasMinimumRole, invalidRole, validMoney } from "@/lib/server/authorization"
 
-async function context() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: "Not authenticated" as const }
-  const { data: organizationId, error } = await supabase.rpc("get_or_create_current_organization")
-  if (error || !organizationId) return { error: "Shop could not be initialized" as const }
-  return { supabase, user, organizationId }
-}
+const context = getOrganizationContext
 
 export async function createCustomer(input: { name: string; phone?: string; email?: string; creditLimit?: number }) {
   const result = await context()
   if ("error" in result) return result
-  if (!input.name.trim()) return { error: "Customer name is required" }
+  if (!input.name.trim() || input.name.trim().length > 160) return { error: "Enter a valid customer name" }
+  if (input.creditLimit !== undefined && !validMoney(input.creditLimit)) return { error: "Enter a valid credit limit" }
+  if (!hasMinimumRole(result.role, "cashier")) return invalidRole("cashier")
   const { error } = await result.supabase.from("customers").insert({ user_id: result.user.id, organization_id: result.organizationId, name: input.name.trim(), phone: input.phone?.trim() || null, email: input.email?.trim() || null, credit_limit: Math.max(0, Number(input.creditLimit) || 0), balance: 0 })
   if (error) return { error: "Could not create customer" }
   revalidatePath("/dashboard/customers")
@@ -28,7 +23,9 @@ export async function createCustomer(input: { name: string; phone?: string; emai
 export async function createExpense(input: { category: string; description?: string; amount: number; expenseDate?: string }) {
   const result = await context()
   if ("error" in result) return result
-  if (!input.category.trim() || !Number.isFinite(input.amount) || input.amount <= 0) return { error: "Enter a category and positive amount" }
+  if (!hasMinimumRole(result.role, "accountant")) return invalidRole("accountant")
+  if (!input.category.trim() || input.category.trim().length > 120 || !validMoney(input.amount) || input.amount <= 0) return { error: "Enter a category and positive amount" }
+  if (input.expenseDate && Number.isNaN(Date.parse(input.expenseDate))) return { error: "Enter a valid expense date" }
   const { error } = await result.supabase.from("expenses").insert({ organization_id: result.organizationId, category: input.category.trim(), description: input.description?.trim() || null, amount: input.amount, expense_date: input.expenseDate || undefined, created_by: result.user.id })
   if (error) return { error: "Could not record expense" }
   revalidatePath("/dashboard/expenses")

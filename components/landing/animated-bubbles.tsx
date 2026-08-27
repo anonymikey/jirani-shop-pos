@@ -3,11 +3,12 @@
 import { useEffect, useRef } from "react"
 
 function Bubble({ index }: { index: number }) {
-  const size = 8 + Math.random() * 24
-  const left = Math.random() * 100
-  const delay = Math.random() * 8
-  const duration = 6 + Math.random() * 10
-  const opacity = 0.08 + Math.random() * 0.25
+  const seed = (index * 37 + 11) % 100
+  const size = 8 + (seed % 24)
+  const left = (seed * 13) % 100
+  const delay = (seed * 7) % 8
+  const duration = 6 + (seed % 10)
+  const opacity = 0.08 + (seed % 25) / 100
 
   return (
     <div
