@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { notifyOrganization } from "@/app/actions/notification-events"
 import { revalidatePath } from "next/cache"
+import { getOrganizationContext, hasMinimumRole, invalidRole, isUuid, validIdempotencyKey, validMoney } from "@/lib/server/authorization"
 
 export type CartLine = {
   product_id: string
@@ -43,28 +44,18 @@ function friendlyCheckoutError(message: string | null): string {
 }
 
 export async function checkout(input: CheckoutInput) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { error: "Not authenticated" }
-  if (input.lines.length === 0) return { error: "Cart is empty" }
-
-  const invalidLine = input.lines.find(
-    (line) => !line.product_id || !Number.isInteger(line.quantity) || line.quantity <= 0,
-  )
-  if (invalidLine) return { error: "Invalid cart quantity" }
-
-  if (!Number.isFinite(input.amountPaid) || input.amountPaid < 0) {
-    return { error: "Enter a valid amount paid" }
-  }
-
-  const { data: organizationId, error: organizationError } = await supabase.rpc(
-    "get_or_create_current_organization",
-  )
-  if (organizationError || !organizationId) {
-    return { error: "Your shop could not be initialized" }
-  }
+  const context = await getOrganizationContext()
+  if ("error" in context) return context
+  if (!hasMinimumRole(context.role, "cashier")) return invalidRole("cashier")
+  if (!Array.isArray(input.lines) || input.lines.length === 0 || input.lines.length > 100) return { error: "Cart is empty or too large" }
+  if (input.lines.some((line) => !isUuid(line.product_id) || !Number.isInteger(line.quantity) || line.quantity <= 0 || line.quantity > 10000 || !validMoney(line.unit_price))) return { error: "One of the items has an invalid quantity or price" }
+  if (!validMoney(input.amountPaid)) return { error: "Enter a valid amount paid" }
+  if (!validMoney(input.discount) || !Number.isFinite(input.taxRate) || input.taxRate < 0 || input.taxRate > 100) return { error: "Enter valid discount and tax values" }
+  if (input.customerId !== null && input.customerId !== undefined && !isUuid(input.customerId)) return { error: "The selected customer is invalid" }
+  if (input.dueAt && Number.isNaN(Date.parse(input.dueAt))) return { error: "Enter a valid due date" }
+  if (input.idempotencyKey && !validIdempotencyKey(input.idempotencyKey)) return { error: "Invalid checkout reference" }
+  const supabase = context.supabase
+  const organizationId = context.organizationId
 
   const paymentMethod = input.paymentMethod
   const receiptNumber = `JR-${Date.now().toString().slice(-8)}`
@@ -74,10 +65,10 @@ export async function checkout(input: CheckoutInput) {
       receipt_number: receiptNumber,
       customer_id: input.customerId,
       customer_name: input.customerName?.trim() || null,
-      discount: Math.max(0, Number(input.discount) || 0),
-      tax: Math.max(0, Math.round(((Number(input.taxRate) || 0) / 100) * Math.max(0, input.lines.reduce((sum, line) => sum + line.unit_price * line.quantity, 0) - Math.max(0, Number(input.discount) || 0)) * 100) / 100),
+      discount: input.discount,
+      tax: Math.round((input.taxRate / 100) * Math.max(0, input.lines.reduce((sum, line) => sum + line.unit_price * line.quantity, 0) - input.discount) * 100) / 100,
       payment_method: paymentMethod,
-      amount_paid: Math.min(Math.max(0, Number(input.amountPaid) || 0), Number.POSITIVE_INFINITY),
+      amount_paid: input.amountPaid,
       due_at: input.dueAt ?? null,
       idempotency_key: input.idempotencyKey ?? crypto.randomUUID(),
       items: input.lines.map((line) => ({
