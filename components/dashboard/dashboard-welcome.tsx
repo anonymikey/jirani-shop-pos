@@ -15,8 +15,21 @@ function getGreeting(hour: number) {
   if (hour < 5) return { label: "Good night", icon: "🌙" }
   if (hour < 12) return { label: "Good morning", icon: "👋" }
   if (hour < 18) return { label: "Good afternoon", icon: "👋" }
-  if (hour < 22) return { label: "Good evening", icon: "👋" }
+  if (hour < 21) return { label: "Good evening", icon: "👋" }
   return { label: "Good night", icon: "🌙" }
+}
+
+function getEastAfricaHour(date: Date): number {
+  // Use formatToParts with explicit hourCycle to guarantee 24-hour extraction
+  const formatter = new Intl.DateTimeFormat("en-KE", {
+    timeZone: EAST_AFRICA_TIME_ZONE,
+    hourCycle: "h23",
+    hour: "numeric",
+    minute: "2-digit",
+  })
+  const parts = formatter.formatToParts(date)
+  const hourPart = parts.find((p) => p.type === "hour")
+  return hourPart ? Number(hourPart.value) : 0
 }
 
 function getEastAfricaParts(date: Date) {
@@ -43,7 +56,7 @@ export function DashboardWelcome({ userName, shopName, initialNow }: DashboardWe
   }, [])
 
   const parts = getEastAfricaParts(now ?? new Date())
-  const hour = Number(parts.hour) % 12 + (parts.dayPeriod === "PM" ? 12 : 0)
+  const hour = getEastAfricaHour(now ?? new Date())
   const greeting = getGreeting(hour)
   const displayName = userName?.trim() || "there"
   const displayShop = shopName?.trim() || "JIRANI SHOP"
