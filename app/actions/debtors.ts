@@ -12,7 +12,13 @@ export async function createDebtor(input: { name: string; phone?: string; openin
   if (!input.name.trim() || input.name.trim().length > 160 || !validMoney(input.openingAmount) || input.openingAmount <= 0) return { error: "Enter a valid debtor and positive opening amount" }
   if (input.dueAt && Number.isNaN(Date.parse(input.dueAt))) return { error: "Enter a valid due date" }
   const { error } = await result.supabase.rpc("create_debtor", { payload: { organization_id: result.organizationId, name: input.name.trim(), phone: input.phone?.trim() || null, opening_amount: input.openingAmount, due_at: input.dueAt ? new Date(`${input.dueAt}T23:59:59`).toISOString() : null } })
-  if (error) return { error: "Could not create debtor" }
+  if (error) {
+    console.error("[v0] createDebtor RPC failed", { code: error.code, message: error.message, details: error.details, hint: error.hint })
+    if (error.message?.toLowerCase().includes("duplicate") || error.code === "23505") return { error: "A debtor with these details already exists" }
+    if (error.message?.toLowerCase().includes("foreign key") || error.code === "23503") return { error: "Your shop account is not ready for debtor records. Refresh and try again." }
+    if (error.message?.toLowerCase().includes("not authorized")) return { error: "You are not authorized to add debtors" }
+    return { error: "Could not create debtor. Check the amount and try again." }
+  }
   revalidatePath("/dashboard/debtors")
   return { success: true }
 }
