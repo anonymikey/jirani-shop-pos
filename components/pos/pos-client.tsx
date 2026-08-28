@@ -89,8 +89,8 @@ export function PosClient({ products, customers }: { products: Product[]; custom
       toast.error(result.error ?? "Could not restock product")
       return
     }
-    setCatalog((current) => current.map((item) => item.id === product.id ? { ...item, quantity: result.quantity ?? 100 } : item))
-    toast.success(`${product.name} restocked to 100`)
+    setCatalog((current) => current.map((item) => item.id === product.id ? { ...item, quantity: result.quantity ?? 2000 } : item))
+    toast.success(`${product.name} restocked to 2000`)
   }
 
   useEffect(() => {
@@ -535,7 +535,7 @@ export function PosClient({ products, customers }: { products: Product[]; custom
                     disabled={restockingProductId === p.id}
                   >
                     {restockingProductId === p.id && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
-                    {restockingProductId === p.id ? "Restocking..." : "Restock to 100"}
+                    {restockingProductId === p.id ? "Restocking..." : "Restock to 2000"}
                   </Button>
                 )}
               </div>

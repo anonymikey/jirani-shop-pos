@@ -68,12 +68,12 @@ export async function restockProduct(input: { productId: string }) {
 
   const currentQuantity = Number(product.quantity)
   if (!Number.isInteger(currentQuantity) || currentQuantity < 0) return { error: "Product stock is invalid" }
-  const restockQuantity = 100 - currentQuantity
+  const restockQuantity = 2000 - currentQuantity
   if (restockQuantity <= 0) return { quantity: currentQuantity }
 
   const { error } = await supabase
     .from("products")
-    .update({ quantity: 100 })
+    .update({ quantity: 2000 })
     .eq("id", input.productId)
     .eq("organization_id", org)
     .eq("status", "active")
@@ -95,7 +95,7 @@ export async function restockProduct(input: { productId: string }) {
   revalidatePath("/dashboard/inventory")
   revalidatePath("/dashboard/pos")
   revalidatePath("/dashboard")
-  return { quantity: 100 }
+  return { quantity: 2000 }
 }
 
 export async function updateProduct(input: { productId: string; name: string; brand?: string; sku?: string; costPrice: number; sellingPrice: number; reorderLevel: number; supplierId?: string | null }) {
@@ -173,7 +173,11 @@ export async function adjustInventory(input: { productId: string; quantity: numb
   const { error } = await supabase.from("products").update({ quantity: nextQuantity }).eq("id", input.productId).eq("organization_id", org)
   if (error) return { error: "Could not update stock" }
   const { error: movementError } = await supabase.from("inventory_movements").insert({ organization_id: org, product_id: input.productId, movement_type: "adjustment", quantity: input.quantity, note: input.note || null, created_by: user.id })
-  if (movementError) return { error: "Stock changed but the audit entry failed" }
+  if (movementError) {
+    // Roll back the stock change so quantity stays consistent with the audit trail
+    await supabase.from("products").update({ quantity: Number(product.quantity) }).eq("id", input.productId).eq("organization_id", org)
+    return { error: "Could not record the audit entry. Stock was left unchanged." }
+  }
   revalidatePath("/dashboard/inventory")
   revalidatePath("/dashboard/pos")
   revalidatePath("/dashboard")
