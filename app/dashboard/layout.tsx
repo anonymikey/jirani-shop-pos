@@ -4,6 +4,7 @@ import { AppSidebar } from "@/components/app-sidebar"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { SyncStatus } from "@/components/sync-status"
+import { OnboardingTour } from "@/components/onboarding/onboarding-tour"
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
@@ -71,6 +72,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         </header>
         <div className="flex-1 p-4 md:p-6">{children}</div>
       </SidebarInset>
+      <OnboardingTour />
     </SidebarProvider>
   )
 }

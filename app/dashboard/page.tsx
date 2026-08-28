@@ -151,7 +151,7 @@ export default async function DashboardPage() {
   ]
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6" data-tour="welcome">
       <DashboardWelcome initialNow={now.toISOString()} userName={profile?.full_name ?? user?.user_metadata?.full_name ?? user?.email?.split("@")[0]} shopName={organization?.name} />
       <DeveloperNote />
       <div className="flex flex-wrap items-center justify-between gap-3">

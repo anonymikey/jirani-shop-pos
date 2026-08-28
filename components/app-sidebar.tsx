@@ -45,28 +45,28 @@ import { InstallAppLink } from "@/components/install-app"
 const groups = [
   {
     label: "Overview",
-    items: [{ title: "Dashboard", href: "/dashboard", icon: LayoutDashboard }],
+    items: [{ title: "Dashboard", href: "/dashboard", icon: LayoutDashboard, tour: "welcome" }],
   },
   {
     label: "Sell",
     items: [
-      { title: "Point of Sale", href: "/dashboard/pos", icon: ScanLine },
-      { title: "Sales", href: "/dashboard/sales", icon: Receipt },
+      { title: "Point of Sale", href: "/dashboard/pos", icon: ScanLine, tour: "pos" },
+      { title: "Sales", href: "/dashboard/sales", icon: Receipt, tour: "sales" },
     ],
   },
   {
     label: "Manage",
     items: [
-      { title: "Inventory", href: "/dashboard/inventory", icon: Boxes },
-      { title: "Customers", href: "/dashboard/customers", icon: Users },
+      { title: "Inventory", href: "/dashboard/inventory", icon: Boxes, tour: "inventory" },
+      { title: "Customers", href: "/dashboard/customers", icon: Users, tour: "customers" },
       { title: "Debtors", href: "/dashboard/debtors", icon: UserRoundPlus },
-      { title: "Reports", href: "/dashboard/reports", icon: BarChart3 },
+      { title: "Reports", href: "/dashboard/reports", icon: BarChart3, tour: "reports" },
     ],
   },
   {
     label: "System",
     items: [
-      { title: "Notifications", href: "/dashboard/notifications", icon: Bell },
+      { title: "Notifications", href: "/dashboard/notifications", icon: Bell, tour: "notifications" },
       { title: "Settings", href: "/dashboard/settings", icon: Settings },
     ],
   },
@@ -98,7 +98,7 @@ export function AppSidebar({ name, email, role, unreadNotifications = 0 }: { nam
                   const active = pathname === item.href
                   return (
                     <SidebarMenuItem key={item.href}>
-                      <SidebarMenuButton render={<Link href={item.href}><item.icon className="size-4" /><span>{item.title}</span>{item.title === "Notifications" && unreadNotifications > 0 && <span className="ml-auto flex size-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">{unreadNotifications > 9 ? "9+" : unreadNotifications}</span>}</Link>} isActive={active} tooltip={item.title} />
+                      <SidebarMenuButton render={<Link href={item.href} {...("tour" in item && item.tour ? { "data-tour": item.tour } : {})}><item.icon className="size-4" /><span>{item.title}</span>{item.title === "Notifications" && unreadNotifications > 0 && <span className="ml-auto flex size-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">{unreadNotifications > 9 ? "9+" : unreadNotifications}</span>}</Link>} isActive={active} tooltip={item.title} />
                     </SidebarMenuItem>
                   )
                 })}
