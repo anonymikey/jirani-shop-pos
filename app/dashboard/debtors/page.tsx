@@ -4,13 +4,14 @@ import { Badge } from "@/components/ui/badge"
 import { formatEATDate, formatKES } from "@/lib/format"
 import { PaymentForm } from "@/components/customers/payment-form"
 import { DueDateForm } from "@/components/customers/due-date-form"
-import { CustomerForm } from "@/components/customers/customer-form"
+import { DebtorForm } from "@/components/customers/debtor-form"
+import { DebtorActions } from "@/components/customers/debtor-actions"
 import { ChevronDown, CircleDollarSign } from "lucide-react"
 
 export default async function DebtorsPage() {
   const supabase = await createClient()
   const [{ data: customers }, { data: sales }, { data: payments }] = await Promise.all([
-    supabase.from("customers").select("id, name, phone, email, credit_limit, balance").order("name"),
+    supabase.from("customers").select("id, name, phone, email, credit_limit, balance, archived_at").order("name"),
     supabase.from("sales").select("id, customer_id, receipt_number, total, due_at, created_at").eq("status", "completed").not("customer_id", "is", null).order("created_at", { ascending: false }),
     supabase.from("payments").select("id, customer_id, sale_id, amount, method, reference, created_at").not("customer_id", "is", null),
   ])
@@ -35,8 +36,9 @@ export default async function DebtorsPage() {
     const overdue = Boolean(debt?.dueAt && new Date(debt.dueAt) < new Date() && balance > 0)
     return { ...customer, balance, dueAt: debt?.dueAt ?? null, overdue }
   })
-  const active = records.filter((customer) => customer.balance > 0)
-  const cleared = records.filter((customer) => customer.balance === 0 && debtByCustomer.has(customer.id))
+  const active = records.filter((customer) => customer.balance > 0 && !customer.archived_at)
+  const cleared = records.filter((customer) => customer.balance === 0 && (debtByCustomer.has(customer.id) || Number(customer.balance) === 0) && !customer.archived_at)
+  const archived = records.filter((customer) => Boolean(customer.archived_at))
   const totalDue = active.reduce((sum, customer) => sum + customer.balance, 0)
   const overdue = active.filter((customer) => customer.overdue).length
   const saleByCustomer = new Map<string, typeof sales>()
@@ -52,7 +54,7 @@ export default async function DebtorsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-4"><div><h1 className="text-2xl font-bold tracking-tight">Debtors</h1><p className="text-sm text-muted-foreground">Track customers who currently owe JIRANI money.</p></div><CustomerForm mode="debtor" /></div>
+      <div className="flex flex-wrap items-end justify-between gap-4"><div><h1 className="text-2xl font-bold tracking-tight">Debtors</h1><p className="text-sm text-muted-foreground">Track customers who currently owe JIRANI money.</p></div><DebtorForm /></div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Card><CardHeader><CardTitle className="text-sm text-muted-foreground">Outstanding</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold">{formatKES(totalDue)}</p></CardContent></Card>
         <Card><CardHeader><CardTitle className="text-sm text-muted-foreground">Active debtors</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold">{active.length}</p></CardContent></Card>
@@ -74,6 +76,7 @@ export default async function DebtorsPage() {
                   <div className="mt-4 flex flex-col gap-4 rounded-lg border border-border bg-muted/20 p-4">
                     <div><p className="text-sm font-medium">Debt repayment</p><p className="text-xs text-muted-foreground">Record money received against this customer&apos;s outstanding account.</p></div>
                     <PaymentForm customerId={customer.id} balance={customer.balance} customerName={customer.name} phone={customer.phone} />
+                    <DebtorActions customerId={customer.id} archived={Boolean(customer.archived_at)} />
                     <div className="grid gap-4 lg:grid-cols-2"><div><p className="mb-2 text-xs font-medium text-muted-foreground">Credit history</p>{(saleByCustomer.get(customer.id) ?? []).slice(0, 10).map((sale) => <div key={sale.id} className="flex items-center justify-between border-b border-border py-2 text-xs"><span>{sale.receipt_number || "Credit sale"}<br /><span className="text-muted-foreground">{formatEATDate(sale.created_at, { dateStyle: "medium" })}</span><span className="mt-1 block"><DueDateForm saleId={sale.id} dueAt={sale.due_at} /></span></span><span className="font-medium">{formatKES(Number(sale.total) - (salePaid.get(sale.id) ?? 0))} due</span></div>)}</div><div><p className="mb-2 text-xs font-medium text-muted-foreground">Payments</p>{(paymentByCustomer.get(customer.id) ?? []).slice(0, 10).map((payment) => <div key={payment.id} className="flex items-center justify-between border-b border-border py-2 text-xs"><span className="capitalize">{payment.method.replace("_", " ")}<br /><span className="text-muted-foreground">{formatEATDate(payment.created_at, { dateStyle: "medium" })}</span></span><span className="font-medium">{formatKES(Number(payment.amount))}</span></div>)}</div></div>
                   </div>
                 </details>
@@ -86,6 +89,7 @@ export default async function DebtorsPage() {
         <summary className="cursor-pointer list-none px-4 py-4 text-sm font-medium">Cleared debtor history <span className="ml-2 text-xs font-normal text-muted-foreground">{cleared.length} accounts</span></summary>
         <div className="border-t border-border px-4 py-3">{cleared.length === 0 ? <p className="text-sm text-muted-foreground">No cleared debtor history yet.</p> : <div className="flex flex-col gap-2">{cleared.map((customer) => <div key={customer.id} className="flex items-center justify-between rounded-md bg-muted/20 px-3 py-2 text-sm"><span>{customer.name}</span><Badge variant="outline">Cleared</Badge></div>)}</div>}</div>
       </details>
+      {archived.length > 0 && <details className="rounded-xl border border-border bg-card"><summary className="cursor-pointer list-none px-4 py-4 text-sm font-medium">Archived debtors <span className="ml-2 text-xs font-normal text-muted-foreground">{archived.length} accounts</span></summary><div className="flex flex-col gap-2 border-t border-border px-4 py-3">{archived.map((customer) => <div key={customer.id} className="rounded-md bg-muted/20 px-3 py-3 text-sm"><div className="flex items-center justify-between"><span>{customer.name}</span><Badge variant="outline">Archived</Badge></div><DebtorActions customerId={customer.id} archived /></div>)}</div></details>}
     </div>
   )
 }
