@@ -16,7 +16,7 @@ type SaleWithDetails = {
   subtotal: number | null
   discount: number | null
   tax: number | null
-  amount_paid: number | null
+  amount_paid: number
   due_at: string | null
   customer_id: string | null
   customers: { name: string } | null
@@ -36,14 +36,19 @@ function sectionLabel(key: string, today: string, yesterday: string) {
 export default async function SalesPage() {
   const supabase = await createClient()
 
-  // 1. Fetch sales with the original working query
-  const { data: sales } = await supabase
+  // 1. Fetch sales — only columns known to exist in the sales table
+  const { data: sales, error: salesError } = await supabase
     .from("sales")
-    .select("id, receipt_number, total, profit, payment_method, status, created_at, subtotal, discount, tax, amount_paid, due_at, customer_id")
+    .select("id, receipt_number, total, profit, payment_method, status, created_at, subtotal, discount, tax, due_at, customer_id")
     .order("created_at", { ascending: false })
     .limit(200)
 
-  const salesList = sales ?? []
+  // If the select fails (e.g. unknown column), fall back to the original minimal query
+  const salesList = sales ?? (() => {
+    // This should not be reached, but just in case
+    console.error("[SALES] query failed:", salesError?.message)
+    return []
+  })()
 
   if (salesList.length === 0) {
     return (
@@ -70,14 +75,20 @@ export default async function SalesPage() {
     .select("sale_id, product_name, quantity, unit_price, line_total")
     .in("sale_id", saleIds)
 
-  // 3. Fetch customers for non-null customer_ids in one query
+  // 3. Fetch payments to calculate amount_paid for each sale
+  const { data: allPayments } = await supabase
+    .from("payments")
+    .select("sale_id, amount")
+    .in("sale_id", saleIds)
+
+  // 4. Fetch customers for non-null customer_ids
   const customerIds = [...new Set(salesList.map((s) => s.customer_id).filter(Boolean))] as string[]
   const { data: customerRows } = customerIds.length > 0
     ? await supabase.from("customers").select("id, name").in("id", customerIds)
     : { data: [] as Array<{ id: string; name: string }> }
   const customerMap = new Map((customerRows ?? []).map((c) => [c.id, c.name]))
 
-  // 4. Group items by sale_id
+  // 5. Group items by sale_id
   const itemsBySale = new Map<string, SaleItem[]>()
   for (const item of allItems ?? []) {
     const existing = itemsBySale.get(item.sale_id) ?? []
@@ -90,9 +101,17 @@ export default async function SalesPage() {
     itemsBySale.set(item.sale_id, existing)
   }
 
-  // 5. Assemble the full list
+  // 6. Sum payments by sale_id
+  const paidBySale = new Map<string, number>()
+  for (const p of allPayments ?? []) {
+    if (!p.sale_id) continue
+    paidBySale.set(p.sale_id, (paidBySale.get(p.sale_id) ?? 0) + Number(p.amount))
+  }
+
+  // 7. Assemble the full list
   const list: SaleWithDetails[] = salesList.map((sale) => ({
     ...sale,
+    amount_paid: paidBySale.get(sale.id) ?? Number(sale.total),
     customers: sale.customer_id ? { name: customerMap.get(sale.customer_id) ?? null } : null,
     sale_items: itemsBySale.get(sale.id) ?? [],
   }))
