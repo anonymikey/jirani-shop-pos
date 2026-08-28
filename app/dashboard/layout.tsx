@@ -4,7 +4,9 @@ import { AppSidebar } from "@/components/app-sidebar"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
 import { SyncStatus } from "@/components/sync-status"
+import { NotificationBell } from "@/components/notification-bell"
 import { OnboardingTour } from "@/components/onboarding/onboarding-tour"
+import { WhatsNew } from "@/components/onboarding/whats-new"
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
@@ -68,10 +70,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
           <span className="text-sm font-medium text-muted-foreground">
             {new Intl.DateTimeFormat("en-KE", { timeZone: "Africa/Nairobi", weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date())}
           </span>
-          <div className="ml-auto"><SyncStatus /></div>
+          <div className="ml-auto flex items-center gap-2"><SyncStatus /><NotificationBell initialCount={unreadNotifications ?? 0} /></div>
         </header>
         <div className="flex-1 p-4 md:p-6">{children}</div>
       </SidebarInset>
+      <WhatsNew />
       <OnboardingTour />
     </SidebarProvider>
   )

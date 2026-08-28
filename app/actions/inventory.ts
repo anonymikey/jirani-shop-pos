@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { createClient } from "@/lib/supabase/server"
+import { notifyOrganization } from "@/app/actions/notification-events"
 
 export async function createProduct(input: { name: string; brand?: string; sku?: string; costPrice: number; sellingPrice: number; quantity: number; reorderLevel: number }) {
   const supabase = await createClient()
@@ -45,6 +46,7 @@ export async function createProduct(input: { name: string; brand?: string; sku?:
   revalidatePath("/dashboard/inventory")
   revalidatePath("/dashboard/pos")
   revalidatePath("/dashboard")
+  await notifyOrganization({ organizationId: org, type: "product_created", title: "Product added", body: `${name} was added to inventory with ${input.quantity} units.` })
   return { productId: product.id }
 }
 
@@ -95,6 +97,7 @@ export async function restockProduct(input: { productId: string }) {
   revalidatePath("/dashboard/inventory")
   revalidatePath("/dashboard/pos")
   revalidatePath("/dashboard")
+  await notifyOrganization({ organizationId: org, type: "product_restocked", title: "Product restocked", body: `Stock was restocked to 2000 units.` })
   return { quantity: 2000 }
 }
 
@@ -121,6 +124,7 @@ export async function updateProduct(input: { productId: string; name: string; br
     if (priceError) return { error: "Product updated, but its approved selling price could not be registered" }
   }
   revalidatePath("/dashboard/inventory"); revalidatePath("/dashboard/pos"); revalidatePath("/dashboard")
+  await notifyOrganization({ organizationId: org, type: "product_updated", title: "Product updated", body: `${name} was updated in inventory.` })
   return { productId: product.id, product }
 }
 
@@ -134,6 +138,7 @@ export async function createSupplier(input: { name: string; phone?: string; note
   if (error || !data) return { error: "Could not add supplier" }
   revalidatePath("/dashboard/inventory")
   revalidatePath("/dashboard/pos")
+  await notifyOrganization({ organizationId: org, type: "supplier_added", title: "Supplier added", body: `${name} was added as a new supplier.` })
   return { supplier: data }
 }
 
@@ -181,5 +186,7 @@ export async function adjustInventory(input: { productId: string; quantity: numb
   revalidatePath("/dashboard/inventory")
   revalidatePath("/dashboard/pos")
   revalidatePath("/dashboard")
+  const direction = input.quantity > 0 ? "increased" : "decreased"
+  await notifyOrganization({ organizationId: org, type: "stock_adjusted", title: "Stock adjusted", body: `Stock was ${direction} by ${Math.abs(input.quantity)} units.` })
   return { quantity: nextQuantity }
 }
