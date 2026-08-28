@@ -178,12 +178,17 @@ function SaleRow({ sale, expanded, onToggle, total, paid, outstanding, customerN
   function handlePrint(e: React.MouseEvent) {
     e.stopPropagation()
     const html = buildReceipt(sale)
-    const win = window.open("", "_blank", "noopener,noreferrer,width=480,height=640")
-    if (!win) return
-    win.document.write(html)
-    win.document.close()
-    win.focus()
-    setTimeout(() => { try { win.print() } catch {} }, 300)
+    const blob = new Blob([html], { type: "text/html" })
+    const url = URL.createObjectURL(blob)
+    const win = window.open(url, "_blank", "noopener,noreferrer,width=480,height=640")
+    if (win) {
+      win.addEventListener("load", () => {
+        URL.revokeObjectURL(url)
+        try { win.print() } catch {}
+      })
+    } else {
+      URL.revokeObjectURL(url)
+    }
   }
 
   return (
