@@ -4,6 +4,7 @@ import { formatEATDate, formatKES } from "@/lib/format"
 import { getPeriodRange, isValidPeriod, PERIOD_LABELS, type PeriodKey } from "@/lib/periods"
 import { PeriodPicker } from "@/components/reports/period-picker"
 import { Banknote, HandCoins, Scale, Smartphone, CreditCard, NotebookPen, Receipt } from "lucide-react"
+import { ReportPrint } from "@/components/reports/report-print"
 
 function sum(values: number[]) {
   return values.reduce((a, b) => a + b, 0)
@@ -105,7 +106,16 @@ export default async function ReportsPage({
             {PERIOD_LABELS[period]} · {dateLabel}
           </p>
         </div>
-        <PeriodPicker period={period} from={from} to={to} />
+        <div className="flex items-center gap-2">
+          <ReportPrint
+            title={`${PERIOD_LABELS[period]} Report`}
+            dateLabel={dateLabel}
+            salesRows={salesRows.map((r) => ({ label: r.label, value: formatKES(r.value), bold: r.bold }))}
+            collectionRows={collectionRows.map((r) => ({ label: r.label, value: formatKES(r.value), bold: r.bold }))}
+            accountingRows={accountingRows.map((r) => ({ label: r.label, value: formatKES(r.value), bold: r.bold }))}
+          />
+          <PeriodPicker period={period} from={from} to={to} />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
