@@ -137,6 +137,25 @@ export async function createSupplier(input: { name: string; phone?: string; note
   return { supplier: data }
 }
 
+export async function createOutOfStockRequest(input: { productName: string; productId?: string | null; supplierId?: string | null; quantity: number; note?: string }) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: "Not authenticated" }
+  const productName = input.productName.trim()
+  if (!productName) return { error: "Goods name is required" }
+  if (!Number.isInteger(input.quantity) || input.quantity <= 0) return { error: "Requested quantity must be a positive whole number" }
+  const { data: org, error: orgError } = await supabase.rpc("get_or_create_current_organization")
+  if (orgError || !org) return { error: "Shop could not be initialized" }
+  if (input.productId) { const { data: product } = await supabase.from("products").select("id").eq("id", input.productId).eq("organization_id", org).maybeSingle(); if (!product) return { error: "Product not found in this shop" } }
+  if (input.supplierId) { const { data: supplier } = await supabase.from("suppliers").select("id").eq("id", input.supplierId).eq("organization_id", org).maybeSingle(); if (!supplier) return { error: "Supplier not found in this shop" } }
+  const { data: request, error } = await supabase.from("out_of_stock_requests").insert({ organization_id: org, product_id: input.productId || null, supplier_id: input.supplierId || null, product_name: productName, quantity_requested: input.quantity, note: input.note?.trim() || null, created_by: user.id }).select("id").single()
+  if (error || !request) return { error: "Could not record out-of-stock request" }
+  const { data: members } = await supabase.from("organization_members").select("user_id").eq("organization_id", org).eq("is_active", true)
+  if (members?.length) await supabase.from("notifications").insert(members.map((member) => ({ organization_id: org, user_id: member.user_id, type: "supplier_restock", title: "Supplier restock needed", body: `${productName}: request ${input.quantity} units from the supplier.` })))
+  revalidatePath("/dashboard/suppliers"); revalidatePath("/dashboard/inventory"); revalidatePath("/dashboard/notifications")
+  return { requestId: request.id }
+}
+
 export async function adjustInventory(input: { productId: string; quantity: number; note?: string }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
