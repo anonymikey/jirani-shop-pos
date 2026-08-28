@@ -74,21 +74,21 @@ function buildReceipt(sale: Sale) {
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Receipt ${esc(sale.receipt_number || sale.id)}</title>
 <style>
-  body{font-family:monospace;max-width:420px;margin:0 auto;padding:20px;color:#000}
-  h1{text-align:center;font-size:16px;margin:0 0 4px}
-  .sub{text-align:center;font-size:11px;color:#666;margin-bottom:16px}
+  body{font-family:monospace;max-width:420px;margin:0 auto;padding:20px;color:#000;font-size:15px}
+  h1{text-align:center;font-size:22px;margin:0 0 4px}
+  .sub{text-align:center;font-size:14px;color:#666;margin-bottom:16px}
   hr{border:0;border-top:1px dashed #999;margin:12px 0}
   table{width:100%;border-collapse:collapse}
-  td{padding:3px 0;font-size:13px}
-  .total-row{font-weight:bold;font-size:15px}
-  .footer{text-align:center;margin-top:24px;font-size:11px;color:#666}
-  @media print{body{padding:0}}
+  td{padding:5px 0;font-size:15px}
+  .total-row{font-weight:bold;font-size:18px}
+  .footer{text-align:center;margin-top:24px;font-size:13px;color:#666}
+  @media print{body{padding:0;font-size:14px}}
 </style></head><body>
 <h1>JIRANI SHOP SYSTEM</h1>
 <div class="sub">${esc(sale.receipt_number || "—")} &bull; ${dateStr}, ${timeStr}</div>
 <hr>
 <table>
-<tr><th style="text-align:left;font-size:12px">Item</th><th style="text-align:center;font-size:12px">Qty</th><th style="text-align:right;font-size:12px">Price</th><th style="text-align:right;font-size:12px">Total</th></tr>
+<tr><th style="text-align:left;font-size:14px">Item</th><th style="text-align:center;font-size:14px">Qty</th><th style="text-align:right;font-size:14px">Price</th><th style="text-align:right;font-size:14px">Total</th></tr>
 <tr><td colspan="4"><hr style="border:0;border-top:1px dashed #ccc;margin:4px 0"></td></tr>
 ${itemRows}
 <tr><td colspan="4"><hr style="border:0;border-top:1px dashed #ccc;margin:4px 0"></td></tr>
