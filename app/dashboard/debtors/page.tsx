@@ -52,7 +52,7 @@ export default async function DebtorsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-4"><div><h1 className="text-2xl font-bold tracking-tight">Debtors</h1><p className="text-sm text-muted-foreground">Track customers who currently owe JIRANI money.</p></div><CustomerForm /></div>
+      <div className="flex flex-wrap items-end justify-between gap-4"><div><h1 className="text-2xl font-bold tracking-tight">Debtors</h1><p className="text-sm text-muted-foreground">Track customers who currently owe JIRANI money.</p></div><CustomerForm mode="debtor" /></div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Card><CardHeader><CardTitle className="text-sm text-muted-foreground">Outstanding</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold">{formatKES(totalDue)}</p></CardContent></Card>
         <Card><CardHeader><CardTitle className="text-sm text-muted-foreground">Active debtors</CardTitle></CardHeader><CardContent><p className="text-2xl font-bold">{active.length}</p></CardContent></Card>

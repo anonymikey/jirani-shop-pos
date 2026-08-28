@@ -8,8 +8,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
-export function CustomerForm() {
+type CustomerFormProps = {
+  mode?: "customer" | "debtor"
+}
+
+export function CustomerForm({ mode = "customer" }: CustomerFormProps) {
   const router = useRouter()
+  const isDebtor = mode === "debtor"
   const [open, setOpen] = useState(false)
   const [pending, startTransition] = useTransition()
 
@@ -25,7 +30,7 @@ export function CustomerForm() {
         toast.error(result.error)
         return
       }
-      toast.success("Customer added")
+      toast.success(isDebtor ? "Debtor account added" : "Customer added")
       setOpen(false)
       router.refresh()
     })
@@ -34,7 +39,7 @@ export function CustomerForm() {
   return (
     <div className="rounded-xl border border-border bg-card p-4">
       {!open ? (
-        <Button type="button" onClick={() => setOpen(true)}>Add customer</Button>
+        <Button type="button" onClick={() => setOpen(true)}>{isDebtor ? "Add debtor" : "Add customer"}</Button>
       ) : (
         <form action={submit} className="grid gap-3 sm:grid-cols-4">
           <div className="grid gap-1.5 sm:col-span-2">
@@ -50,7 +55,7 @@ export function CustomerForm() {
             <Input id="customer-limit" name="creditLimit" type="number" min="0" placeholder="Optional" />
           </div>
           <div className="flex gap-2 sm:col-span-4">
-            <Button type="submit" disabled={pending}>{pending ? "Saving..." : "Save customer"}</Button>
+            <Button type="submit" disabled={pending}>{pending ? "Saving..." : isDebtor ? "Save debtor" : "Save customer"}</Button>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
           </div>
         </form>
