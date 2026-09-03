@@ -146,7 +146,7 @@ export default async function DashboardPage() {
   const quickLinks = [
     { label: "Daily Report", href: "/dashboard/reports?period=today", icon: FileText },
     { label: "All Reports", href: "/dashboard/reports", icon: BarChart3 },
-    { label: "Debtors", href: "/dashboard/customers", icon: Users },
+    { label: "Debtors", href: "/dashboard/debtors", icon: Users },
     { label: "POS", href: "/dashboard/pos", icon: ScanLine },
   ]
 
@@ -246,7 +246,7 @@ export default async function DashboardPage() {
         <CardContent className="flex flex-wrap items-center justify-between gap-3">
           <div className="text-3xl font-bold">{formatKES(outstandingDebt)}</div>
           <Button asChild variant="outline" size="sm">
-            <Link href="/dashboard/customers">View debtors</Link>
+            <Link href="/dashboard/debtors">View debtors</Link>
           </Button>
         </CardContent>
       </Card>
