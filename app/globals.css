@@ -960,6 +960,71 @@
   color: rgba(255, 255, 255, 0.35);
 }
 
+/* Daily Quote splash animations */
+.daily-quote-hidden {
+  opacity: 0;
+  transform: scale(0.96) translateY(8px);
+}
+
+.daily-quote-splash {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  animation: quote-splash 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes quote-splash {
+  0% {
+    opacity: 0;
+    transform: scale(0.92) translateY(12px);
+    filter: blur(4px);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.015) translateY(-2px);
+    filter: blur(0px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0px);
+  }
+}
+
+.daily-quote-icon-pulse {
+  animation: icon-breathe 2.4s ease-in-out infinite;
+}
+
+@keyframes icon-breathe {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+}
+
+@keyframes shimmer {
+  0%, 100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .daily-quote-splash,
+  .daily-quote-icon-pulse {
+    animation: none !important;
+  }
+  .daily-quote-hidden {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* Animations */
 @keyframes fadeInUp {
   from {
@@ -982,8 +1047,14 @@
   .landing-hero-actions,
   .landing-stats,
   .landing-feature-card,
-  .landing-product {
+  .landing-product,
+  .daily-quote-splash,
+  .daily-quote-icon-pulse {
     animation: none !important;
     transition: none !important;
+  }
+  .daily-quote-hidden {
+    opacity: 1;
+    transform: none;
   }
 }
